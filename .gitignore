@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+
+/playground/
+
+/backend/bin/
+*.exe
+*.test
+
+__pycache__/
+.venv/
