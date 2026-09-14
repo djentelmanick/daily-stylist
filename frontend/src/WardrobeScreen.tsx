@@ -8,6 +8,7 @@ import { useLongPress } from './useLongPress'
 export function WardrobeScreen({
   options,
   items,
+  wornItemIds,
   onBack,
   onOpenItem,
   onAddItem,
@@ -15,6 +16,7 @@ export function WardrobeScreen({
 }: {
   options: Options
   items: Item[]
+  wornItemIds: number[]
   onBack: () => void
   onOpenItem: (itemId: number) => void
   onAddItem: () => void
@@ -93,6 +95,7 @@ export function WardrobeScreen({
             categoryLabel={labelOf(options.categories, item.category)}
             statusLabel={labelOf(options.statuses, item.status)}
             inSeason={item.seasons.includes(options.current_season)}
+            worn={wornItemIds.includes(item.id)}
             checked={selected?.includes(item.id) ?? null}
             onPress={() => (selected === null ? onOpenItem(item.id) : select(item.id))}
             onLongPress={() => select(item.id)}
@@ -125,6 +128,7 @@ function ItemRow({
   categoryLabel,
   statusLabel,
   inSeason,
+  worn,
   checked,
   onPress,
   onLongPress,
@@ -133,6 +137,7 @@ function ItemRow({
   categoryLabel: string
   statusLabel: string
   inSeason: boolean
+  worn: boolean
   // null - не в режиме выбора.
   checked: boolean | null
   onPress: () => void
@@ -158,8 +163,9 @@ function ItemRow({
           <span className="item-row-name">{item.name}</span>
           <span className="hint">{categoryLabel}</span>
         </span>
-        {(item.status !== availableStatus || !inSeason) && (
+        {(worn || item.status !== availableStatus || !inSeason) && (
           <span className="badges">
+            {worn && <span className="badge badge-worn">{texts.worn}</span>}
             {item.status !== availableStatus && <span className="badge">{statusLabel}</span>}
             {!inSeason && <span className="badge">{texts.notInSeason}</span>}
           </span>

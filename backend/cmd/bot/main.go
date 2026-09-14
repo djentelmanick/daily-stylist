@@ -8,7 +8,11 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+	// Часовые пояса городов: в контейнере без системной базы поясов time.LoadLocation их не найдёт.
+	_ "time/tzdata"
 
+	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/openmeteo"
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/postgres"
 	"github.com/djentelmanick/daily-stylist/backend/internal/config"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
@@ -47,7 +51,12 @@ func run() error {
 		return err
 	}
 
-	wardrobe := service.NewWardrobe(postgres.NewItemRepository(pool))
+	items := postgres.NewItemRepository(pool)
+	locations := postgres.NewLocationRepository(pool)
+	weather := openmeteo.NewClient()
+
+	wardrobe := service.NewWardrobe(items)
+	recommender := service.NewRecommender(items, postgres.NewOutfitRepository(pool), locations, weather, time.Now)
 
 	b, err := telegram.New(telegram.Options{
 		Token:          cfg.Token,
@@ -55,7 +64,7 @@ func run() error {
 		WebhookPath:    cfg.WebhookPath,
 		WebhookSecret:  cfg.WebhookSecret,
 		ListenAddr:     cfg.ListenAddr,
-		MiniApp:        miniapp.NewHandler(cfg.Token, wardrobe),
+		MiniApp:        miniapp.NewHandler(cfg.Token, wardrobe, recommender, service.NewLocations(locations, weather)),
 	}, handlers.Default)
 	if err != nil {
 		return err

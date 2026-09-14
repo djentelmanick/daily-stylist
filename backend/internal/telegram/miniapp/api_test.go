@@ -20,7 +20,7 @@ const validItemBody = `{"name":"Синее худи","description":"С капю�
 
 func TestCreateItem_SavesItem(t *testing.T) {
 	repository := &memoryRepository{}
-	handler := NewHandler(testBotToken, service.NewWardrobe(repository))
+	handler := newHandler(service.NewWardrobe(repository))
 
 	response := serve(handler, newRequest(http.MethodPost, "/api/items", validItemBody, signedInitData(testBotToken, 42, time.Now())))
 
@@ -45,7 +45,7 @@ func TestCreateItem_SavesItem(t *testing.T) {
 }
 
 func TestListItems_ReturnsOnlyOwnItems(t *testing.T) {
-	handler := NewHandler(testBotToken, service.NewWardrobe(&memoryRepository{}))
+	handler := newHandler(service.NewWardrobe(&memoryRepository{}))
 	createAs(t, handler, 42)
 	createAs(t, handler, 7)
 	createAs(t, handler, 42)
@@ -56,7 +56,7 @@ func TestListItems_ReturnsOnlyOwnItems(t *testing.T) {
 }
 
 func TestListItems_EmptyWardrobeIsEmptyArray(t *testing.T) {
-	handler := NewHandler(testBotToken, service.NewWardrobe(&memoryRepository{}))
+	handler := newHandler(service.NewWardrobe(&memoryRepository{}))
 
 	response := serve(handler, newRequest(http.MethodGet, "/api/items", "", signedInitData(testBotToken, 42, time.Now())))
 
@@ -66,7 +66,7 @@ func TestListItems_EmptyWardrobeIsEmptyArray(t *testing.T) {
 }
 
 func TestEditItem_ChangesFieldsAndKeepsStatus(t *testing.T) {
-	handler := NewHandler(testBotToken, service.NewWardrobe(&memoryRepository{}))
+	handler := newHandler(service.NewWardrobe(&memoryRepository{}))
 	itemID := createAs(t, handler, 42)
 	initData := signedInitData(testBotToken, 42, time.Now())
 	serve(handler, newRequest(http.MethodPut, itemPath(itemID)+"/status", `{"status":"dirty"}`, initData))
@@ -88,7 +88,7 @@ func TestEditItem_ChangesFieldsAndKeepsStatus(t *testing.T) {
 
 func TestChangeItemStatus(t *testing.T) {
 	repository := &memoryRepository{}
-	handler := NewHandler(testBotToken, service.NewWardrobe(repository))
+	handler := newHandler(service.NewWardrobe(repository))
 	itemID := createAs(t, handler, 42)
 	initData := signedInitData(testBotToken, 42, time.Now())
 
@@ -105,7 +105,7 @@ func TestChangeItemStatus(t *testing.T) {
 }
 
 func TestItemRoutes_HideOtherUsersItems(t *testing.T) {
-	handler := NewHandler(testBotToken, service.NewWardrobe(&memoryRepository{}))
+	handler := newHandler(service.NewWardrobe(&memoryRepository{}))
 	itemID := createAs(t, handler, 42)
 	stranger := signedInitData(testBotToken, 7, time.Now())
 
@@ -130,7 +130,7 @@ func TestItemRoutes_HideOtherUsersItems(t *testing.T) {
 }
 
 func TestDeleteItems_DeletesOnlyOwnItems(t *testing.T) {
-	handler := NewHandler(testBotToken, service.NewWardrobe(&memoryRepository{}))
+	handler := newHandler(service.NewWardrobe(&memoryRepository{}))
 	first := createAs(t, handler, 42)
 	second := createAs(t, handler, 42)
 	strangers := createAs(t, handler, 7)
@@ -151,7 +151,7 @@ func TestDeleteItems_DeletesOnlyOwnItems(t *testing.T) {
 }
 
 func TestDeleteItems_RequiresIDs(t *testing.T) {
-	handler := NewHandler(testBotToken, failingWardrobe{err: errors.New("сервис не должен вызываться")})
+	handler := newHandler(failingWardrobe{err: errors.New("сервис не должен вызываться")})
 
 	response := serve(handler, newRequest(http.MethodPost, "/api/items/delete", `{"ids":[]}`, signedInitData(testBotToken, 42, time.Now())))
 
@@ -171,7 +171,7 @@ func TestCreateItem_MapsErrors(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			handler := NewHandler(testBotToken, failingWardrobe{err: test.err})
+			handler := newHandler(failingWardrobe{err: test.err})
 
 			response := serve(handler, newRequest(http.MethodPost, "/api/items", validItemBody, signedInitData(testBotToken, 42, time.Now())))
 
@@ -181,7 +181,7 @@ func TestCreateItem_MapsErrors(t *testing.T) {
 }
 
 func TestCreateItem_RejectsBadRequests(t *testing.T) {
-	handler := NewHandler(testBotToken, failingWardrobe{err: errors.New("сервис не должен вызываться")})
+	handler := newHandler(failingWardrobe{err: errors.New("сервис не должен вызываться")})
 	now := time.Now()
 
 	tests := []struct {
@@ -206,7 +206,7 @@ func TestCreateItem_RejectsBadRequests(t *testing.T) {
 }
 
 func TestOptions_ListsDomainValues(t *testing.T) {
-	handler := NewHandler(testBotToken, failingWardrobe{})
+	handler := newHandler(failingWardrobe{})
 
 	response := serve(handler, newRequest(http.MethodGet, "/api/options", "", signedInitData(testBotToken, 42, time.Now())))
 

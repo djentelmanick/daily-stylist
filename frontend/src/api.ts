@@ -45,16 +45,53 @@ export type Item = ItemFields & {
 
 export const availableStatus = 'available'
 
+export type City = {
+  name: string
+  region: string
+  latitude: number
+  longitude: number
+  timezone: string
+}
+
+export type Outfit = {
+  items: Item[]
+  notes: string[]
+}
+
+export type Recommendation = {
+  city: City
+  weather: {
+    temperature: string
+    details: string[]
+  }
+  outfits: Outfit[]
+  // Почему образов нет.
+  notes: string[]
+}
+
 export type ApiErrorCode =
   | 'unauthorized'
   | 'bad_request'
   | 'invalid_item'
   | 'not_found'
   | 'wardrobe_full'
+  | 'invalid_location'
+  | 'location_not_set'
+  | 'weather_unavailable'
   | 'internal'
   | 'network'
 
-const serverErrorCodes: ApiErrorCode[] = ['unauthorized', 'bad_request', 'invalid_item', 'not_found', 'wardrobe_full', 'internal']
+const serverErrorCodes: ApiErrorCode[] = [
+  'unauthorized',
+  'bad_request',
+  'invalid_item',
+  'not_found',
+  'wardrobe_full',
+  'invalid_location',
+  'location_not_set',
+  'weather_unavailable',
+  'internal',
+]
 
 export class ApiError extends Error {
   readonly code: ApiErrorCode
@@ -92,6 +129,28 @@ export function changeItemStatus(itemId: number, status: string): Promise<void> 
 
 export function deleteItems(itemIds: number[]): Promise<void> {
   return request<void>('POST', '/api/items/delete', { ids: itemIds })
+}
+
+export function fetchRecommendation(): Promise<Recommendation> {
+  return request<Recommendation>('GET', '/api/recommendation')
+}
+
+export async function fetchTodayOutfit(): Promise<number[]> {
+  const body = await request<{ item_ids: number[] }>('GET', '/api/outfits/today')
+  return body.item_ids
+}
+
+export function wearToday(itemIds: number[]): Promise<void> {
+  return request<void>('PUT', '/api/outfits/today', { item_ids: itemIds })
+}
+
+export async function searchCities(query: string): Promise<City[]> {
+  const body = await request<{ cities: City[] }>('GET', `/api/cities?${new URLSearchParams({ query })}`)
+  return body.cities
+}
+
+export function saveCity(city: City): Promise<void> {
+  return request<void>('PUT', '/api/city', city)
 }
 
 async function request<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown): Promise<T> {

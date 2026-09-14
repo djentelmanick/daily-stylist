@@ -1,12 +1,16 @@
+import type { Item } from './api'
 import { items, texts } from './texts'
+import { Swatch } from './ui'
 
 export function HomeScreen({
   itemCount,
+  todayItems,
   onOpenWardrobe,
   onAddItem,
   onRecommend,
 }: {
   itemCount: number
+  todayItems: Item[]
   onOpenWardrobe: () => void
   onAddItem: () => void
   onRecommend: () => void
@@ -19,6 +23,20 @@ export function HomeScreen({
         <p className="hint">{texts.today(now)}</p>
         <h1>{texts.greeting(now.getHours())}</h1>
       </header>
+
+      {todayItems.length > 0 && (
+        <section className="today-card">
+          <p className="hint">{texts.todayOutfit}</p>
+          <ul className="today-items">
+            {todayItems.map((item) => (
+              <li key={item.id} className="today-item">
+                <Swatch color={item.main_color} />
+                {item.name}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <button type="button" className="hero" onClick={onRecommend}>
         <span className="hero-icon">
@@ -40,15 +58,6 @@ export function HomeScreen({
         />
         <Tile icon={icons.plus} title={texts.addItem} hint={texts.addItemHint} onClick={onAddItem} />
       </div>
-    </div>
-  )
-}
-
-export function RecommendationScreen() {
-  return (
-    <div className="screen">
-      <h1>{texts.recommendation}</h1>
-      <p className="notice">{texts.recommendationSoon}</p>
     </div>
   )
 }

@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { fetchItems, fetchOptions, type Item, type Options } from './api'
-import { HomeScreen, RecommendationScreen } from './HomeScreen'
+import { fetchItems, fetchOptions, fetchTodayOutfit, type Item, type Options } from './api'
+import { CityScreen } from './CityScreen'
+import { HomeScreen } from './HomeScreen'
 import { AddItemScreen, EditItemScreen } from './ItemFormScreens'
 import { ItemScreen } from './ItemScreen'
+import { RecommendationScreen } from './RecommendationScreen'
 import { getInitData, useBackButton } from './telegram'
 import { errorTexts, texts } from './texts'
 import { WardrobeScreen } from './WardrobeScreen'
@@ -11,7 +13,7 @@ type State =
   | { kind: 'loading' }
   | { kind: 'outsideTelegram' }
   | { kind: 'failed' }
-  | { kind: 'ready'; options: Options; items: Item[] }
+  | { kind: 'ready'; options: Options; items: Item[]; todayOutfit: number[] }
 
 export function App() {
   const [state, setState] = useState<State>(() =>
@@ -24,10 +26,10 @@ export function App() {
     }
 
     let cancelled = false
-    Promise.all([fetchOptions(), fetchItems()])
-      .then(([options, items]) => {
+    Promise.all([fetchOptions(), fetchItems(), fetchTodayOutfit()])
+      .then(([options, items, todayOutfit]) => {
         if (!cancelled) {
-          setState({ kind: 'ready', options, items })
+          setState({ kind: 'ready', options, items, todayOutfit })
         }
       })
       .catch(() => {
@@ -48,7 +50,7 @@ export function App() {
     case 'failed':
       return <p className="message">{texts.loadFailed}</p>
     case 'ready':
-      return <Screens options={state.options} initialItems={state.items} />
+      return <Screens options={state.options} initialItems={state.items} initialTodayOutfit={state.todayOutfit} />
   }
 }
 
@@ -59,11 +61,21 @@ type Screen =
   | { kind: 'edit'; itemId: number }
   | { kind: 'add' }
   | { kind: 'recommendation' }
+  | { kind: 'city' }
 
 // Экраны лежат стопкой: открыть - положить сверху, «Назад» - снять верхний.
 // Все изменения идут через приложение, поэтому список вещей загружается один раз и дальше правится на месте.
-function Screens({ options, initialItems }: { options: Options; initialItems: Item[] }) {
+function Screens({
+  options,
+  initialItems,
+  initialTodayOutfit,
+}: {
+  options: Options
+  initialItems: Item[]
+  initialTodayOutfit: number[]
+}) {
   const [items, setItems] = useState(initialItems)
+  const [todayOutfit, setTodayOutfit] = useState(initialTodayOutfit)
   const [stack, setStack] = useState<Screen[]>([{ kind: 'home' }])
   const screen = stack[stack.length - 1]
 
@@ -97,6 +109,7 @@ function Screens({ options, initialItems }: { options: Options; initialItems: It
       return (
         <HomeScreen
           itemCount={items.length}
+          todayItems={todayOutfit.flatMap((itemId) => items.filter((item) => item.id === itemId))}
           onOpenWardrobe={() => open({ kind: 'wardrobe' })}
           onAddItem={() => open({ kind: 'add' })}
           onRecommend={() => open({ kind: 'recommendation' })}
@@ -107,6 +120,7 @@ function Screens({ options, initialItems }: { options: Options; initialItems: It
         <WardrobeScreen
           options={options}
           items={items}
+          wornItemIds={todayOutfit}
           onBack={back}
           onOpenItem={(itemId) => open({ kind: 'item', itemId })}
           onAddItem={() => open({ kind: 'add' })}
@@ -123,10 +137,18 @@ function Screens({ options, initialItems }: { options: Options; initialItems: It
       )
     case 'recommendation':
       return (
-        <WithBackButton onBack={back}>
-          <RecommendationScreen />
-        </WithBackButton>
+        <RecommendationScreen
+          options={options}
+          wornItemIds={todayOutfit}
+          onWorn={setTodayOutfit}
+          onBack={back}
+          onChooseCity={() => open({ kind: 'city' })}
+          onAddItem={() => open({ kind: 'add' })}
+        />
       )
+    case 'city':
+      return <CityScreen onBack={back} onSaved={back} />
+
     case 'item':
     case 'edit': {
       const item = items.find((candidate) => candidate.id === screen.itemId)
