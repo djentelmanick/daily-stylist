@@ -62,8 +62,8 @@ check-back:
 	cd backend && go test ./... && golangci-lint run --build-tags integration
 
 check-db:
-	@test -n '$(DATABASE_URL)' || { echo "нет DATABASE_URL: скопируйте backend/.env.example в backend/.env"; exit 1; }
-	cd backend && TEST_DATABASE_URL='$(DATABASE_URL)' go test -tags integration ./internal/adapter/postgres/
+	@test -n '$(TEST_DATABASE_URL)' || { echo "нет TEST_DATABASE_URL в backend/.env: возьмите строку из backend/.env.example"; exit 1; }
+	cd backend && TEST_DATABASE_URL='$(TEST_DATABASE_URL)' go test -count=1 -tags integration ./internal/adapter/postgres/
 
 check-front:
 	cd frontend && npm run lint && npm run build

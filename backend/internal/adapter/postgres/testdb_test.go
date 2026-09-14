@@ -5,6 +5,7 @@ package postgres_test
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -13,6 +14,18 @@ import (
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/postgres"
 )
+
+func TestMain(m *testing.M) {
+	if databaseURL := os.Getenv("TEST_DATABASE_URL"); databaseURL != "" {
+		pool, err := postgres.Connect(context.Background(), databaseURL)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "база для тестов недоступна, поднимите её: make db\n%v\n", err)
+			os.Exit(1)
+		}
+		pool.Close()
+	}
+	m.Run()
+}
 
 func newTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()

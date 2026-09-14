@@ -160,6 +160,7 @@ docker compose --env-file backend/.env -f deploy/docker-compose.yml exec postgre
 - **Адрес ngrok меняется при каждом перезапуске.** Обновите `TELEGRAM_WEBHOOK_BASE_URL`, перезапустите бэкенд и заново укажите адрес в BotFather. Чтобы не делать этого каждый раз, возьмите в ngrok бесплатный постоянный домен.
 - **ngrok показывает страницу-предупреждение.** Нажмите «Visit Site».
 - **Бот пишет «есть непримененные миграции».** После `git pull` появились новые миграции: выполните `(cd backend && go run ./cmd/migrate up)`.
+- **`make check-db` пишет `database "stylist_test" does not exist`.** Том базы создан раньше, чем появился скрипт, который её создаёт. Один раз выполните в `make psql`: `CREATE DATABASE stylist_test;`.
 
 ### Миграции
 
@@ -212,15 +213,17 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 (cd backend && go test ./... && golangci-lint run --build-tags integration)
 ```
 
-Тесты адаптера Postgres помечены тегом `integration` и без базы не запускаются. Проще всего `make check-db`: адрес базы он берёт из `backend/.env`. Вручную, с поднятой базой:
+Тесты адаптера Postgres помечены тегом `integration` и без базы не запускаются. Работают они в отдельной базе `stylist_test` в том же контейнере, рабочие данные не видят. Проще всего `make check-db`: адрес он берёт из `TEST_DATABASE_URL` в `backend/.env`. Вручную, с поднятой базой:
 
 ```bash
-(cd backend && TEST_DATABASE_URL=<адрес базы> go test -tags integration ./internal/adapter/postgres/)
+(cd backend && TEST_DATABASE_URL=<адрес базы> go test -count=1 -tags integration ./internal/adapter/postgres/)
 ```
 
-Со значениями из `backend/.env.example` адрес - `postgres://stylist:stylist@localhost:55432/stylist`.
+`-count=1` отключает кэш результатов: без него Go покажет `ok (cached)`, даже если база выключена, потому что код с прошлого запуска не менялся.
 
-Каждый тест создаёт себе отдельную схему и удаляет её после себя, так что данные разработки не пострадают.
+Со значениями из `backend/.env.example` адрес - `postgres://stylist:stylist@localhost:55432/stylist_test`.
+
+Внутри неё каждый тест создаёт себе отдельную схему и удаляет её после себя, так что тесты не мешают друг другу.
 
 Тесты с детектором гонок (`go test -race`) заметно медленнее - их гоняет CI.
 
