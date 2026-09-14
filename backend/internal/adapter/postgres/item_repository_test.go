@@ -3,11 +3,14 @@
 package postgres_test
 
 import (
+	"errors"
+	"reflect"
 	"slices"
 	"testing"
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/postgres"
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
+	"github.com/djentelmanick/daily-stylist/backend/internal/service"
 )
 
 func TestItemRepository_CreateAndCount(t *testing.T) {
@@ -92,6 +95,123 @@ func TestItemRepository_CreateStoresEveryField(t *testing.T) {
 		!stored.waterproof ||
 		stored.status != "available" {
 		t.Errorf("в базе = %+v", stored)
+	}
+}
+
+func TestItemRepository_ReadsBackWhatWasCreated(t *testing.T) {
+	pool := newTestPool(t)
+	repository := postgres.NewItemRepository(pool)
+
+	withExtras := newItem(t, 1)
+	withExtras.Colors.Extra = []domain.Color{domain.ColorWhite, domain.ColorGray}
+	withExtras.Seasons = []domain.Season{domain.SeasonWinter, domain.SeasonSpring}
+	older, err := repository.Create(t.Context(), withExtras)
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	newer, err := repository.Create(t.Context(), newItem(t, 1))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	got, err := repository.Get(t.Context(), 1, older.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if !reflect.DeepEqual(got, older) {
+		t.Errorf("Get = %+v\nожидалась %+v", got, older)
+	}
+
+	items, err := repository.ListByUser(t.Context(), 1)
+	if err != nil {
+		t.Fatalf("ListByUser: %v", err)
+	}
+	newer.Colors.Extra = []domain.Color{}
+	if want := []domain.Item{newer, older}; !reflect.DeepEqual(items, want) {
+		t.Errorf("ListByUser = %+v\nожидались сначала новые: %+v", items, want)
+	}
+}
+
+func TestItemRepository_HidesOtherUsersItems(t *testing.T) {
+	pool := newTestPool(t)
+	repository := postgres.NewItemRepository(pool)
+
+	item, err := repository.Create(t.Context(), newItem(t, 1))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	stranger := item
+	stranger.UserID = 2
+
+	if _, err := repository.Get(t.Context(), 2, item.ID); !errors.Is(err, service.ErrItemNotFound) {
+		t.Errorf("Get чужой вещи: ошибка = %v, ожидалась ErrItemNotFound", err)
+	}
+	if err := repository.Update(t.Context(), stranger); !errors.Is(err, service.ErrItemNotFound) {
+		t.Errorf("Update чужой вещи: ошибка = %v, ожидалась ErrItemNotFound", err)
+	}
+	if err := repository.UpdateStatus(t.Context(), 2, item.ID, domain.ItemStatusDirty); !errors.Is(err, service.ErrItemNotFound) {
+		t.Errorf("UpdateStatus чужой вещи: ошибка = %v, ожидалась ErrItemNotFound", err)
+	}
+	if err := repository.Delete(t.Context(), 2, []int64{item.ID}); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+
+	got, err := repository.Get(t.Context(), 1, item.ID)
+	if err != nil {
+		t.Fatalf("Get своей вещи: %v", err)
+	}
+	if got.Status != domain.ItemStatusAvailable {
+		t.Errorf("чужой пользователь поменял статус: %q", got.Status)
+	}
+}
+
+func TestItemRepository_UpdateStatusAndDelete(t *testing.T) {
+	pool := newTestPool(t)
+	repository := postgres.NewItemRepository(pool)
+
+	first, err := repository.Create(t.Context(), newItem(t, 1))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	second, err := repository.Create(t.Context(), newItem(t, 1))
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	if err := repository.UpdateStatus(t.Context(), 1, first.ID, domain.ItemStatusDirty); err != nil {
+		t.Fatalf("UpdateStatus: %v", err)
+	}
+	edited, err := first.Edit(domain.EditItemParams{
+		Name:     "Зонт",
+		Category: domain.CategoryUmbrella,
+		Colors:   domain.Colors{Main: domain.ColorBlack},
+		Seasons:  []domain.Season{domain.SeasonSpring},
+	})
+	if err != nil {
+		t.Fatalf("Edit: %v", err)
+	}
+	// У edited старый статус available: Update не должен вернуть его в базу.
+	if err := repository.Update(t.Context(), edited); err != nil {
+		t.Fatalf("Update: %v", err)
+	}
+
+	got, err := repository.Get(t.Context(), 1, first.ID)
+	if err != nil {
+		t.Fatalf("Get: %v", err)
+	}
+	if got.Name != "Зонт" || got.WarmthLevel != 0 || got.Status != domain.ItemStatusDirty {
+		t.Errorf("после изменения = %+v", got)
+	}
+
+	if err := repository.Delete(t.Context(), 1, []int64{first.ID}); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	items, err := repository.ListByUser(t.Context(), 1)
+	if err != nil {
+		t.Fatalf("ListByUser: %v", err)
+	}
+	if len(items) != 1 || items[0].ID != second.ID {
+		t.Errorf("после удаления осталось %+v, ожидалась только вещь %d", items, second.ID)
 	}
 }
 

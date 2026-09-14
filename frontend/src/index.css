@@ -33,10 +33,361 @@ h1 {
   color: var(--hint);
 }
 
-.form {
+.screen {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hint {
+  margin: 0;
+  font-size: 14px;
+  color: var(--hint);
+}
+
+.link-button {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.home-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+}
+
+.home-header h1 {
+  font-size: 28px;
+}
+
+.icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+
+/* Цвета - из темы Telegram. Первая строка background и box-shadow - запасная
+   для старых WebView без color-mix: там вторая строка целиком игнорируется. */
+.hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 128px;
+  padding: 20px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--accent);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(255, 255, 255, 0.28), transparent 50%),
+    linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 65%, #000000));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 10px 28px color-mix(in srgb, var(--accent) 40%, transparent);
+  color: var(--accent-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hero-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.hero-icon .icon {
+  width: 30px;
+  height: 30px;
+}
+
+.hero-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hero-title {
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.hero-hint {
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.hero > .icon {
+  opacity: 0.8;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 16px;
+  border: 0;
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tile-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 12px;
+  border-radius: 14px;
+  background: var(--bg);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  color: var(--accent);
+}
+
+.tile-title {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* Отклик на нажатие: без него на телефоне непонятно, попал ли палец по кнопке. */
+.hero,
+.tile,
+.item-row,
+.button,
+.submit {
+  transition: transform 0.12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hero:active,
+.tile:active,
+.item-row:active,
+.button:active:enabled,
+.submit:active:enabled {
+  transform: scale(0.97);
+}
+
+.item-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.item-row-checked {
+  outline: 2px solid var(--accent);
+}
+
+.item-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.item-row-name {
+  overflow: hidden;
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.swatches {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+.checkmark {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--hint);
+  border-radius: 50%;
+  box-sizing: border-box;
+  font-size: 14px;
+}
+
+.checkmark-on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+/* Две метки встают столбиком: в ряд на узком экране они съели бы название. */
+.badges {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.badge {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--hint);
+  font-size: 13px;
+}
+
+.status-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.status-card h2 {
+  margin: 0;
+  font-weight: normal;
+}
+
+.status-options {
+  display: grid;
+  grid-auto-columns: 1fr;
+  grid-auto-flow: column;
+  gap: 8px;
+}
+
+.status-option {
+  padding: 14px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.status-option-selected {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.status-option:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.properties {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+}
+
+.property {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.property dd {
+  margin: 0;
+  font-size: 16px;
+}
+
+.property-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 14px;
+  color: var(--hint);
+}
+
+.color-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.color-list-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.button {
+  flex: 1;
+  padding: 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button-danger {
+  color: var(--danger);
+}
+
+.button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .field {
@@ -185,6 +536,11 @@ textarea:focus {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+.submit-danger {
+  background: var(--danger);
+  color: #ffffff;
 }
 
 .submit:disabled {

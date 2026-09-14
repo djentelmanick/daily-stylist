@@ -1,23 +1,28 @@
-import { useState, type FormEvent, type ReactNode } from 'react'
-import { ApiError, createItem, type Option, type Options, type WarmthLevelOption } from './api'
-import { swatch } from './colors'
-import { errorTexts, texts } from './texts'
+import { useState, type FormEvent } from 'react'
+import type { ItemFields, Option, Options, WarmthLevelOption } from './api'
+import { errorText, texts } from './texts'
+import { Chip, Swatch } from './ui'
 
-type Status =
-  | { kind: 'idle' }
-  | { kind: 'submitting' }
-  | { kind: 'added'; name: string }
-  | { kind: 'failed'; message: string }
+type Status = { kind: 'idle' } | { kind: 'submitting' } | { kind: 'failed'; message: string }
 
-export function ItemForm({ options }: { options: Options }) {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [category, setCategory] = useState('')
-  const [mainColor, setMainColor] = useState('')
-  const [extraColors, setExtraColors] = useState<string[]>([])
-  const [seasons, setSeasons] = useState<string[]>([])
-  const [warmthLevel, setWarmthLevel] = useState(0)
-  const [waterproof, setWaterproof] = useState(false)
+type Props = {
+  options: Options
+  title: string
+  submitText: string
+  initial?: ItemFields
+  notice?: string
+  onSubmit: (fields: ItemFields) => Promise<void>
+}
+
+export function ItemForm({ options, title, submitText, initial, notice, onSubmit }: Props) {
+  const [name, setName] = useState(initial?.name ?? '')
+  const [description, setDescription] = useState(initial?.description ?? '')
+  const [category, setCategory] = useState(initial?.category ?? '')
+  const [mainColor, setMainColor] = useState(initial?.main_color ?? '')
+  const [extraColors, setExtraColors] = useState<string[]>(initial?.extra_colors ?? [])
+  const [seasons, setSeasons] = useState<string[]>(initial?.seasons ?? [])
+  const [warmthLevel, setWarmthLevel] = useState(initial?.warmth_level ?? 0)
+  const [waterproof, setWaterproof] = useState(initial?.waterproof ?? false)
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
 
   const needsWarmth = options.categories.find((option) => option.value === category)?.has_warmth ?? false
@@ -35,22 +40,11 @@ export function ItemForm({ options }: { options: Options }) {
     setExtraColors((current) => current.filter((extra) => extra !== color))
   }
 
-  function reset() {
-    setName('')
-    setDescription('')
-    setCategory('')
-    setMainColor('')
-    setExtraColors([])
-    setSeasons([])
-    setWarmthLevel(0)
-    setWaterproof(false)
-  }
-
   async function submit(event: FormEvent) {
     event.preventDefault()
     setStatus({ kind: 'submitting' })
     try {
-      const item = await createItem({
+      await onSubmit({
         name: name.trim(),
         description: description.trim(),
         category,
@@ -60,17 +54,15 @@ export function ItemForm({ options }: { options: Options }) {
         warmth_level: needsWarmth ? warmthLevel : 0,
         waterproof,
       })
-      reset()
-      setStatus({ kind: 'added', name: item.name })
+      setStatus({ kind: 'idle' })
     } catch (error) {
-      const code = error instanceof ApiError ? error.code : 'internal'
-      setStatus({ kind: 'failed', message: errorTexts[code] })
+      setStatus({ kind: 'failed', message: errorText(error) })
     }
   }
 
   return (
-    <form className="form" onSubmit={submit}>
-      <h1>{texts.title}</h1>
+    <form className="screen" onSubmit={submit}>
+      <h1>{title}</h1>
 
       <label className="field">
         <FieldHeader title={texts.name} length={name.length} limit={options.limits.name} />
@@ -168,11 +160,11 @@ export function ItemForm({ options }: { options: Options }) {
         {texts.waterproof}
       </label>
 
-      {status.kind === 'added' && <p className="notice">{texts.added(status.name)}</p>}
+      {notice && <p className="notice">{notice}</p>}
       {status.kind === 'failed' && <p className="notice notice-error">{status.message}</p>}
 
       <button type="submit" className="submit" disabled={!canSubmit}>
-        {status.kind === 'submitting' ? texts.submitting : texts.submit}
+        {status.kind === 'submitting' ? texts.submitting : submitText}
       </button>
     </form>
   )
@@ -227,18 +219,6 @@ function WarmthSlider({
       <p className={chosen ? 'slider-caption' : 'slider-caption slider-caption-empty'}>{caption}</p>
     </div>
   )
-}
-
-function Chip({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button type="button" className={selected ? 'chip chip-selected' : 'chip'} aria-pressed={selected} onClick={onClick}>
-      {children}
-    </button>
-  )
-}
-
-function Swatch({ color }: { color: string }) {
-  return <span className="swatch" style={{ background: swatch(color) }} />
 }
 
 function toggle(values: string[], value: string): string[] {

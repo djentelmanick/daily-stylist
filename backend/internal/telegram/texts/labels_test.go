@@ -24,6 +24,11 @@ func TestLabelsCoverAllDomainValues(t *testing.T) {
 			t.Errorf("нет подписи для сезона %q", season)
 		}
 	}
+	for _, status := range domain.AllItemStatuses() {
+		if texts.ItemStatus(status) == string(status) {
+			t.Errorf("нет подписи для статуса %q", status)
+		}
+	}
 	for _, level := range domain.AllWarmthLevels() {
 		if texts.WarmthLevel(level) == strconv.Itoa(int(level)) {
 			t.Errorf("нет подписи для уровня теплоты %d", level)

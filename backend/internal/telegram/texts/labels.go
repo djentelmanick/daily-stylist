@@ -22,6 +22,10 @@ func WarmthLevel(level domain.WarmthLevel) string {
 	return labelOrDefault(warmthLevelLabels, level, strconv.Itoa(int(level)))
 }
 
+func ItemStatus(status domain.ItemStatus) string {
+	return labelOrDefault(itemStatusLabels, status, string(status))
+}
+
 func labelOrDefault[K comparable](labels map[K]string, key K, fallback string) string {
 	if label, ok := labels[key]; ok {
 		return label
@@ -70,6 +74,12 @@ var seasonLabels = map[domain.Season]string{
 	domain.SeasonSummer: "Лето",
 	domain.SeasonAutumn: "Осень",
 	domain.SeasonWinter: "Зима",
+}
+
+var itemStatusLabels = map[domain.ItemStatus]string{
+	domain.ItemStatusAvailable: "Доступна",
+	domain.ItemStatusDirty:     "Грязная",
+	domain.ItemStatusArchived:  "В архиве",
 }
 
 var warmthLevelLabels = map[domain.WarmthLevel]string{

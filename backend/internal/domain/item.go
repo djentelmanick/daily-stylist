@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -51,6 +52,30 @@ func NewItem(params NewItemParams) (Item, error) {
 		Waterproof:  params.Waterproof,
 		Status:      ItemStatusAvailable,
 	}
+	if err := item.Validate(); err != nil {
+		return Item{}, err
+	}
+	return item, nil
+}
+
+type EditItemParams struct {
+	Name        string
+	Description string
+	Category    Category
+	Colors      Colors
+	Seasons     []Season
+	WarmthLevel WarmthLevel
+	Waterproof  bool
+}
+
+func (item Item) Edit(params EditItemParams) (Item, error) {
+	item.Name = strings.TrimSpace(params.Name)
+	item.Description = strings.TrimSpace(params.Description)
+	item.Category = params.Category
+	item.Colors = params.Colors
+	item.Seasons = params.Seasons
+	item.WarmthLevel = params.WarmthLevel
+	item.Waterproof = params.Waterproof
 	if err := item.Validate(); err != nil {
 		return Item{}, err
 	}
@@ -218,6 +243,19 @@ func (season Season) Valid() bool {
 	return slices.Contains(allSeasons, season)
 }
 
+func SeasonAt(date time.Time) Season {
+	switch date.Month() {
+	case time.December, time.January, time.February:
+		return SeasonWinter
+	case time.March, time.April, time.May:
+		return SeasonSpring
+	case time.June, time.July, time.August:
+		return SeasonSummer
+	default:
+		return SeasonAutumn
+	}
+}
+
 type WarmthLevel int
 
 const (
@@ -242,11 +280,10 @@ type ItemStatus string
 const (
 	ItemStatusAvailable ItemStatus = "available"
 	ItemStatusDirty     ItemStatus = "dirty"
-	ItemStatusOffSeason ItemStatus = "off_season"
 	ItemStatusArchived  ItemStatus = "archived"
 )
 
-var allItemStatuses = []ItemStatus{ItemStatusAvailable, ItemStatusDirty, ItemStatusOffSeason, ItemStatusArchived}
+var allItemStatuses = []ItemStatus{ItemStatusAvailable, ItemStatusDirty, ItemStatusArchived}
 
 func (status ItemStatus) Valid() bool {
 	return slices.Contains(allItemStatuses, status)
@@ -262,6 +299,10 @@ func AllColors() []Color {
 
 func AllSeasons() []Season {
 	return slices.Clone(allSeasons)
+}
+
+func AllItemStatuses() []ItemStatus {
+	return slices.Clone(allItemStatuses)
 }
 
 func AllWarmthLevels() []WarmthLevel {

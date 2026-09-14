@@ -6,6 +6,8 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
@@ -14,20 +16,29 @@ import (
 
 const maxRequestBodyBytes = 1 << 16
 
-type itemAdder interface {
+type wardrobe interface {
 	AddItem(ctx context.Context, params domain.NewItemParams) (domain.Item, error)
+	Items(ctx context.Context, userID int64) ([]domain.Item, error)
+	EditItem(ctx context.Context, userID, itemID int64, params domain.EditItemParams) (domain.Item, error)
+	ChangeItemStatus(ctx context.Context, userID, itemID int64, status domain.ItemStatus) error
+	DeleteItems(ctx context.Context, userID int64, itemIDs []int64) error
 }
 
 type endpoints struct {
-	wardrobe itemAdder
+	wardrobe wardrobe
 }
 
-func NewHandler(botToken string, wardrobe itemAdder) http.Handler {
+func NewHandler(botToken string, wardrobe wardrobe) http.Handler {
 	api := &endpoints{wardrobe: wardrobe}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/options", api.options)
+	mux.HandleFunc("GET /api/items", api.listItems)
 	mux.HandleFunc("POST /api/items", api.createItem)
+	mux.HandleFunc("PUT /api/items/{id}", api.editItem)
+	mux.HandleFunc("PUT /api/items/{id}/status", api.changeItemStatus)
+	// Не DELETE с телом: тело у DELETE не определено стандартом, и прокси вправе его выбросить.
+	mux.HandleFunc("POST /api/items/delete", api.deleteItems)
 
 	return requireUser(botToken, mux)
 }
@@ -54,16 +65,21 @@ type textLimits struct {
 }
 
 type optionsResponse struct {
-	Categories   []categoryOption    `json:"categories"`
-	Colors       []option            `json:"colors"`
-	Seasons      []option            `json:"seasons"`
-	WarmthLevels []warmthLevelOption `json:"warmth_levels"`
-	Limits       textLimits          `json:"limits"`
+	Categories    []categoryOption    `json:"categories"`
+	Colors        []option            `json:"colors"`
+	Seasons       []option            `json:"seasons"`
+	CurrentSeason string              `json:"current_season"`
+	WarmthLevels  []warmthLevelOption `json:"warmth_levels"`
+	Statuses      []option            `json:"statuses"`
+	Limits        textLimits          `json:"limits"`
 }
 
 func (api *endpoints) options(writer http.ResponseWriter, request *http.Request) {
 	response := optionsResponse{
-		Limits: textLimits{Name: domain.MaxNameLength, Description: domain.MaxDescriptionLength},
+		// TODO: По времени сервера: пока нет часового пояса пользователя, ошибиться можно
+		// только на несколько часов в ночь смены сезона.
+		CurrentSeason: string(domain.SeasonAt(time.Now())),
+		Limits:        textLimits{Name: domain.MaxNameLength, Description: domain.MaxDescriptionLength},
 	}
 	for _, category := range domain.AllCategories() {
 		response.Categories = append(response.Categories, categoryOption{
@@ -81,10 +97,13 @@ func (api *endpoints) options(writer http.ResponseWriter, request *http.Request)
 	for _, level := range domain.AllWarmthLevels() {
 		response.WarmthLevels = append(response.WarmthLevels, warmthLevelOption{Value: int(level), Label: texts.WarmthLevel(level)})
 	}
+	for _, status := range domain.AllItemStatuses() {
+		response.Statuses = append(response.Statuses, option{Value: string(status), Label: texts.ItemStatus(status)})
+	}
 	writeJSON(writer, http.StatusOK, response)
 }
 
-type createItemRequest struct {
+type itemRequest struct {
 	Name        string   `json:"name"`
 	Description string   `json:"description"`
 	Category    string   `json:"category"`
@@ -108,12 +127,27 @@ type itemResponse struct {
 	Status      string   `json:"status"`
 }
 
+type itemsResponse struct {
+	Items []itemResponse `json:"items"`
+}
+
+func (api *endpoints) listItems(writer http.ResponseWriter, request *http.Request) {
+	items, err := api.wardrobe.Items(request.Context(), userIDFrom(request.Context()))
+	if err != nil {
+		writeFailure(writer, err)
+		return
+	}
+
+	response := itemsResponse{Items: make([]itemResponse, len(items))}
+	for index, item := range items {
+		response.Items[index] = toItemResponse(item)
+	}
+	writeJSON(writer, http.StatusOK, response)
+}
+
 func (api *endpoints) createItem(writer http.ResponseWriter, request *http.Request) {
-	var body createItemRequest
-	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, maxRequestBodyBytes))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&body); err != nil {
-		writeError(writer, http.StatusBadRequest, "bad_request")
+	var body itemRequest
+	if !decodeBody(writer, request, &body) {
 		return
 	}
 
@@ -122,26 +156,91 @@ func (api *endpoints) createItem(writer http.ResponseWriter, request *http.Reque
 		Name:        body.Name,
 		Description: body.Description,
 		Category:    domain.Category(body.Category),
-		Colors: domain.Colors{
-			Main:  domain.Color(body.MainColor),
-			Extra: fromStrings[domain.Color](body.ExtraColors),
-		},
+		Colors:      body.colors(),
 		Seasons:     fromStrings[domain.Season](body.Seasons),
 		WarmthLevel: domain.WarmthLevel(body.WarmthLevel),
 		Waterproof:  body.Waterproof,
 	})
+	if err != nil {
+		writeFailure(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusCreated, toItemResponse(item))
+}
 
-	switch {
-	case errors.Is(err, domain.ErrInvalidItem):
-		log.Printf("miniapp: %v", err)
-		writeError(writer, http.StatusUnprocessableEntity, "invalid_item")
-	case errors.Is(err, service.ErrWardrobeFull):
-		writeError(writer, http.StatusConflict, "wardrobe_full")
-	case err != nil:
-		log.Printf("miniapp: %v", err)
-		writeError(writer, http.StatusInternalServerError, "internal")
-	default:
-		writeJSON(writer, http.StatusCreated, toItemResponse(item))
+func (api *endpoints) editItem(writer http.ResponseWriter, request *http.Request) {
+	itemID, ok := itemIDFrom(writer, request)
+	if !ok {
+		return
+	}
+	var body itemRequest
+	if !decodeBody(writer, request, &body) {
+		return
+	}
+
+	item, err := api.wardrobe.EditItem(request.Context(), userIDFrom(request.Context()), itemID, domain.EditItemParams{
+		Name:        body.Name,
+		Description: body.Description,
+		Category:    domain.Category(body.Category),
+		Colors:      body.colors(),
+		Seasons:     fromStrings[domain.Season](body.Seasons),
+		WarmthLevel: domain.WarmthLevel(body.WarmthLevel),
+		Waterproof:  body.Waterproof,
+	})
+	if err != nil {
+		writeFailure(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, toItemResponse(item))
+}
+
+type statusRequest struct {
+	Status string `json:"status"`
+}
+
+func (api *endpoints) changeItemStatus(writer http.ResponseWriter, request *http.Request) {
+	itemID, ok := itemIDFrom(writer, request)
+	if !ok {
+		return
+	}
+	var body statusRequest
+	if !decodeBody(writer, request, &body) {
+		return
+	}
+
+	err := api.wardrobe.ChangeItemStatus(request.Context(), userIDFrom(request.Context()), itemID, domain.ItemStatus(body.Status))
+	if err != nil {
+		writeFailure(writer, err)
+		return
+	}
+	writer.WriteHeader(http.StatusNoContent)
+}
+
+type deleteItemsRequest struct {
+	IDs []int64 `json:"ids"`
+}
+
+func (api *endpoints) deleteItems(writer http.ResponseWriter, request *http.Request) {
+	var body deleteItemsRequest
+	if !decodeBody(writer, request, &body) {
+		return
+	}
+	if len(body.IDs) == 0 {
+		writeError(writer, http.StatusBadRequest, "bad_request")
+		return
+	}
+
+	if err := api.wardrobe.DeleteItems(request.Context(), userIDFrom(request.Context()), body.IDs); err != nil {
+		writeFailure(writer, err)
+		return
+	}
+	writer.WriteHeader(http.StatusNoContent)
+}
+
+func (body itemRequest) colors() domain.Colors {
+	return domain.Colors{
+		Main:  domain.Color(body.MainColor),
+		Extra: fromStrings[domain.Color](body.ExtraColors),
 	}
 }
 
@@ -157,6 +256,40 @@ func toItemResponse(item domain.Item) itemResponse {
 		WarmthLevel: int(item.WarmthLevel),
 		Waterproof:  item.Waterproof,
 		Status:      string(item.Status),
+	}
+}
+
+func decodeBody(writer http.ResponseWriter, request *http.Request, body any) bool {
+	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, maxRequestBodyBytes))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(body); err != nil {
+		writeError(writer, http.StatusBadRequest, "bad_request")
+		return false
+	}
+	return true
+}
+
+func itemIDFrom(writer http.ResponseWriter, request *http.Request) (int64, bool) {
+	itemID, err := strconv.ParseInt(request.PathValue("id"), 10, 64)
+	if err != nil || itemID <= 0 {
+		writeError(writer, http.StatusNotFound, "not_found")
+		return 0, false
+	}
+	return itemID, true
+}
+
+func writeFailure(writer http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, domain.ErrInvalidItem):
+		log.Printf("miniapp: %v", err)
+		writeError(writer, http.StatusUnprocessableEntity, "invalid_item")
+	case errors.Is(err, service.ErrItemNotFound):
+		writeError(writer, http.StatusNotFound, "not_found")
+	case errors.Is(err, service.ErrWardrobeFull):
+		writeError(writer, http.StatusConflict, "wardrobe_full")
+	default:
+		log.Printf("miniapp: %v", err)
+		writeError(writer, http.StatusInternalServerError, "internal")
 	}
 }
 
