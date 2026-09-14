@@ -2,9 +2,7 @@ package handlers
 
 import (
 	"context"
-	"fmt"
 	"log"
-	"strings"
 
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
@@ -12,22 +10,26 @@ import (
 	"github.com/djentelmanick/daily-stylist/backend/internal/telegram/texts"
 )
 
-const namePrefix = "Меня зовут "
-
 func Default(ctx context.Context, b *bot.Bot, update *models.Update) {
-	if update.Message == nil {
+	message := update.Message
+	// В группе ответ на каждое сообщение был бы спамом.
+	if message == nil || message.Chat.Type != models.ChatTypePrivate {
 		return
 	}
 
-	answer := update.Message.Text
-	if name, ok := strings.CutPrefix(update.Message.Text, namePrefix); ok {
-		answer = fmt.Sprintf(texts.Greeting, name)
+	if _, err := b.SendMessage(ctx, welcome(message)); err != nil {
+		log.Printf("telegram: отправка сообщения в чат %d: %v", message.Chat.ID, err)
+	}
+}
+
+func welcome(message *models.Message) *bot.SendMessageParams {
+	var firstName string
+	if message.From != nil {
+		firstName = message.From.FirstName
 	}
 
-	if _, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: update.Message.Chat.ID,
-		Text:   answer,
-	}); err != nil {
-		log.Printf("telegram: отправка сообщения в чат %d: %v", update.Message.Chat.ID, err)
+	return &bot.SendMessageParams{
+		ChatID: message.Chat.ID,
+		Text:   texts.Welcome(firstName),
 	}
 }
