@@ -5,8 +5,12 @@
 /playground/
 
 /backend/bin/
+/backend/data/
 *.exe
 *.test
 
 __pycache__/
 .venv/
+
+node_modules/
+/frontend/dist/
