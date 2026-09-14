@@ -5,6 +5,12 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode/utf8"
+)
+
+const (
+	MaxNameLength        = 30
+	MaxDescriptionLength = 60
 )
 
 var ErrInvalidItem = errors.New("невалидная вещь")
@@ -13,6 +19,7 @@ type Item struct {
 	ID          int64
 	UserID      int64
 	Name        string
+	Description string
 	Category    Category
 	Colors      Colors
 	Seasons     []Season
@@ -24,6 +31,7 @@ type Item struct {
 type NewItemParams struct {
 	UserID      int64
 	Name        string
+	Description string
 	Category    Category
 	Colors      Colors
 	Seasons     []Season
@@ -35,6 +43,7 @@ func NewItem(params NewItemParams) (Item, error) {
 	item := Item{
 		UserID:      params.UserID,
 		Name:        strings.TrimSpace(params.Name),
+		Description: strings.TrimSpace(params.Description),
 		Category:    params.Category,
 		Colors:      params.Colors,
 		Seasons:     params.Seasons,
@@ -54,9 +63,17 @@ func (item Item) Validate() error {
 	if item.UserID <= 0 {
 		problems = append(problems, "не указан владелец")
 	}
-	if strings.TrimSpace(item.Name) == "" {
+
+	name := strings.TrimSpace(item.Name)
+	if name == "" {
 		problems = append(problems, "пустое название")
+	} else if utf8.RuneCountInString(name) > MaxNameLength {
+		problems = append(problems, fmt.Sprintf("название длиннее %d символов", MaxNameLength))
 	}
+	if utf8.RuneCountInString(strings.TrimSpace(item.Description)) > MaxDescriptionLength {
+		problems = append(problems, fmt.Sprintf("описание длиннее %d символов", MaxDescriptionLength))
+	}
+
 	if !item.Category.Valid() {
 		problems = append(problems, fmt.Sprintf("неизвестная категория %q", item.Category))
 	}
@@ -233,6 +250,22 @@ var allItemStatuses = []ItemStatus{ItemStatusAvailable, ItemStatusDirty, ItemSta
 
 func (status ItemStatus) Valid() bool {
 	return slices.Contains(allItemStatuses, status)
+}
+
+func AllCategories() []Category {
+	return slices.Clone(allCategories)
+}
+
+func AllColors() []Color {
+	return slices.Clone(allColors)
+}
+
+func AllSeasons() []Season {
+	return slices.Clone(allSeasons)
+}
+
+func AllWarmthLevels() []WarmthLevel {
+	return []WarmthLevel{WarmthLevelLight, WarmthLevelMedium, WarmthLevelWarm, WarmthLevelHeavy, WarmthLevelExtreme}
 }
 
 func hasDuplicates[T comparable](values []T) bool {
