@@ -5,27 +5,40 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/go-telegram/bot"
 )
 
-const shutdownTimeout = 5 * time.Second
+const (
+	shutdownTimeout   = 5 * time.Second
+	readHeaderTimeout = 10 * time.Second
+)
 
 type Options struct {
-	Token         string
-	WebhookURL    string
-	WebhookSecret string
-	ListenAddr    string
+	Token          string
+	WebhookBaseURL string
+	WebhookPath    string
+	WebhookSecret  string
+	ListenAddr     string
+	MiniApp        http.Handler
 }
 
 type Bot struct {
-	api  *bot.Bot
-	srv  *http.Server
-	opts Options
+	api        *bot.Bot
+	srv        *http.Server
+	webhookURL string
+	opts       Options
 }
 
 func New(opts Options, handler bot.HandlerFunc) (*Bot, error) {
+	webhookURL, pattern, err := webhookRoute(opts.WebhookBaseURL, opts.WebhookPath)
+	if err != nil {
+		return nil, err
+	}
+
 	api, err := bot.New(
 		opts.Token,
 		bot.WithDefaultHandler(handler),
@@ -35,16 +48,39 @@ func New(opts Options, handler bot.HandlerFunc) (*Bot, error) {
 		return nil, fmt.Errorf("создание клиента telegram: %w", err)
 	}
 
+	mux := http.NewServeMux()
+	mux.Handle(pattern, api.WebhookHandler())
+	if opts.MiniApp != nil {
+		mux.Handle("/api/", opts.MiniApp)
+	}
+
 	return &Bot{
-		api:  api,
-		srv:  &http.Server{Addr: opts.ListenAddr, Handler: api.WebhookHandler()},
-		opts: opts,
+		api:        api,
+		srv:        &http.Server{Addr: opts.ListenAddr, Handler: mux, ReadHeaderTimeout: readHeaderTimeout},
+		webhookURL: webhookURL,
+		opts:       opts,
 	}, nil
+}
+
+func webhookRoute(baseURL, path string) (webhookURL, pattern string, err error) {
+	if !strings.HasPrefix(path, "/") {
+		path = "/" + path
+	}
+
+	webhookURL, err = url.JoinPath(baseURL, path)
+	if err != nil {
+		return "", "", fmt.Errorf("адрес вебхука: %w", err)
+	}
+
+	if path == "/" {
+		return webhookURL, "POST /{$}", nil
+	}
+	return webhookURL, "POST " + path, nil
 }
 
 func (b *Bot) Run(ctx context.Context) error {
 	if _, err := b.api.SetWebhook(ctx, &bot.SetWebhookParams{
-		URL:         b.opts.WebhookURL,
+		URL:         b.webhookURL,
 		SecretToken: b.opts.WebhookSecret,
 	}); err != nil {
 		return fmt.Errorf("регистрация вебхука: %w", err)

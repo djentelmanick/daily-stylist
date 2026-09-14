@@ -7,23 +7,31 @@ import (
 	"strings"
 )
 
-const defaultBotListenAddr = ":2000"
+const (
+	defaultBotListenAddr = ":2000"
+	defaultWebhookPath   = "/telegram/webhook"
+	defaultItemsFile     = "data/items.json"
+)
 
 type Bot struct {
-	Token         string
-	WebhookURL    string
-	WebhookSecret string
-	ListenAddr    string
+	Token          string
+	WebhookBaseURL string
+	WebhookPath    string
+	WebhookSecret  string
+	ListenAddr     string
+	ItemsFile      string
 }
 
 func LoadBot() (Bot, error) {
 	var env envReader
 
 	cfg := Bot{
-		Token:         env.required("TELEGRAM_BOT_TOKEN"),
-		WebhookURL:    env.required("TELEGRAM_WEBHOOK_URL"),
-		WebhookSecret: env.required("TELEGRAM_WEBHOOK_SECRET"),
-		ListenAddr:    env.optional("BOT_LISTEN_ADDR", defaultBotListenAddr),
+		Token:          env.required("TELEGRAM_BOT_TOKEN"),
+		WebhookBaseURL: env.required("TELEGRAM_WEBHOOK_BASE_URL"),
+		WebhookPath:    env.optional("TELEGRAM_WEBHOOK_PATH", defaultWebhookPath),
+		WebhookSecret:  env.required("TELEGRAM_WEBHOOK_SECRET"),
+		ListenAddr:     env.optional("BOT_LISTEN_ADDR", defaultBotListenAddr),
+		ItemsFile:      env.optional("ITEMS_FILE", defaultItemsFile),
 	}
 	if err := env.err(); err != nil {
 		return Bot{}, err
