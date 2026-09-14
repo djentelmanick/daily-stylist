@@ -26,6 +26,20 @@ jobs:
   test:
     name: format, build, test
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: stylist
+          POSTGRES_PASSWORD: stylist
+          POSTGRES_DB: stylist
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U stylist -d stylist"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
     steps:
       - uses: actions/checkout@v7
 
@@ -50,7 +64,9 @@ jobs:
         run: go build ./...
 
       - name: test
-        run: go test -race ./...
+        run: go test -race -tags integration ./...
+        env:
+          TEST_DATABASE_URL: postgres://stylist:stylist@localhost:5432/stylist
 
   lint:
     name: golangci-lint
@@ -67,3 +83,4 @@ jobs:
         with:
           version: v2.13.2
           working-directory: backend
+          args: --build-tags integration

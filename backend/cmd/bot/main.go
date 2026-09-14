@@ -3,15 +3,13 @@ package main
 import (
 	"context"
 	"errors"
-	"io/fs"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
-	"github.com/joho/godotenv"
-
-	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/jsonfile"
+	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/postgres"
 	"github.com/djentelmanick/daily-stylist/backend/internal/config"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
 	"github.com/djentelmanick/daily-stylist/backend/internal/telegram"
@@ -26,7 +24,7 @@ func main() {
 }
 
 func run() error {
-	loadDotEnv()
+	config.LoadDotEnv()
 
 	cfg, err := config.LoadBot()
 	if err != nil {
@@ -36,7 +34,20 @@ func run() error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	wardrobe := service.NewWardrobe(jsonfile.NewItemRepository(cfg.ItemsFile))
+	pool, err := postgres.Connect(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+
+	if err := postgres.CheckMigrations(ctx, pool); err != nil {
+		if errors.Is(err, postgres.ErrPendingMigrations) {
+			return fmt.Errorf("%w. Накатите их: go run ./cmd/migrate up", err)
+		}
+		return err
+	}
+
+	wardrobe := service.NewWardrobe(postgres.NewItemRepository(pool))
 
 	b, err := telegram.New(telegram.Options{
 		Token:          cfg.Token,
@@ -52,15 +63,4 @@ func run() error {
 
 	log.Printf("HTTP-сервер слушает %s: вебхук Telegram и API Mini App на %s", cfg.ListenAddr, cfg.WebhookPath)
 	return b.Run(ctx)
-}
-
-func loadDotEnv() {
-	err := godotenv.Load()
-	switch {
-	case err == nil:
-	case errors.Is(err, fs.ErrNotExist):
-		log.Println(".env не найден, читаю переменные окружения")
-	default:
-		log.Printf("не удалось прочитать .env: %v", err)
-	}
 }

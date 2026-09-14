@@ -48,12 +48,13 @@
 backend/                  # Go: бот, логика, база
 ├── cmd/                  # точки входа - по одной на процесс
 │   ├── bot/              #   слушает Telegram
+│   ├── migrate/          #   накатывает и откатывает миграции
 │   └── scheduler/        #   утренняя рассылка по расписанию
 ├── internal/
 │   ├── config/           # настройки из переменных окружения
 │   ├── domain/           # сущности и правила подбора одежды
 │   ├── service/          # сценарии приложения и объявления портов
-│   ├── adapter/          # реализации портов: JSON-файл (временно), postgres, погода, vision
+│   ├── adapter/          # реализации портов: postgres, погода, vision
 │   └── telegram/         # всё, что видит пользователь: хендлеры бота, API Mini App, тексты
 └── migrations/           # SQL-миграции
 
@@ -82,7 +83,7 @@ docs/                     # решения по архитектуре и при
 
 ## Разработка
 
-Нужны Go 1.27+, Node.js 20.19+ и [ngrok](https://ngrok.com/). PostgreSQL и Redis пока не нужны: вещи временно хранятся в JSON-файле `backend/data/items.json`.
+Нужны Go 1.27+, Node.js 20.19+, Docker и [ngrok](https://ngrok.com/). Redis пока не нужен.
 
 ### Первый запуск
 
@@ -100,7 +101,23 @@ docs/                     # решения по архитектуре и при
 
 ### Запуск
 
-Понадобятся три терминала, все команды - из корня репозитория. Начинайте с туннеля: его адрес нужен остальным.
+Все команды - из корня репозитория. Сначала поднимите базу, она работает в фоне:
+
+```bash
+docker compose --env-file backend/.env -f deploy/docker-compose.yml up -d --wait
+```
+
+Логин, пароль и порт базы compose берёт из `backend/.env`, а `DATABASE_URL` там собирается из них же. Данные переживают перезапуск контейнера.
+
+Затем накатите миграции. Бот сам этого не делает и без них не запустится:
+
+```bash
+(cd backend && go run ./cmd/migrate up)
+```
+
+Подробнее - в разделе [«Миграции»](#миграции).
+
+Дальше понадобятся три терминала. Начинайте с туннеля: его адрес нужен остальным.
 
 1. Туннель на фронтенд:
 
@@ -128,7 +145,13 @@ docs/                     # решения по архитектуре и при
 
 4. В @BotFather: `/mybots` → ваш бот → Bot Settings → Menu Button → Configure menu button. Отправьте адрес туннеля, затем название кнопки, например «Гардероб».
 
-Откройте чат с ботом и нажмите кнопку меню. Добавленные вещи появляются в `backend/data/items.json`.
+Откройте чат с ботом и нажмите кнопку меню. Посмотреть добавленные вещи можно в консоли базы:
+
+```bash
+docker compose --env-file backend/.env -f deploy/docker-compose.yml exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"'
+```
+
+и в ней `SELECT id, user_id, name, category FROM items;`.
 
 Как это связано: снаружи виден только туннель на Vite (порт 5173). Vite отдаёт страницу Mini App, а запросы к `/api` и `/telegram` пересылает Go-серверу на порт 2000.
 
@@ -136,6 +159,44 @@ docs/                     # решения по архитектуре и при
 
 - **Адрес ngrok меняется при каждом перезапуске.** Обновите `TELEGRAM_WEBHOOK_BASE_URL`, перезапустите бэкенд и заново укажите адрес в BotFather. Чтобы не делать этого каждый раз, возьмите в ngrok бесплатный постоянный домен.
 - **ngrok показывает страницу-предупреждение.** Нажмите «Visit Site».
+- **Бот пишет «есть непримененные миграции».** После `git pull` появились новые миграции: выполните `(cd backend && go run ./cmd/migrate up)`.
+
+### Миграции
+
+Схемой базы управляет [goose](https://github.com/pressly/goose). Миграции - SQL-файлы в `backend/migrations/`, в каждом секции `-- +goose Up` (как применить) и `-- +goose Down` (как отменить). Бот сам миграции не накатывает: при старте он только проверяет, что применены все, и иначе не запускается.
+
+Применять и откатывать можно двумя способами, результат одинаковый: версию базы оба хранят в таблице `goose_db_version`.
+
+**Через `cmd/migrate`.** Ставить ничего не нужно, миграции встроены в бинарник. Так же они будут применяться на сервере.
+
+```bash
+cd backend
+go run ./cmd/migrate status        # какие применены, какие нет
+go run ./cmd/migrate up            # накатить все новые
+go run ./cmd/migrate up-to 3       # накатить до версии 3 включительно
+go run ./cmd/migrate down          # откатить последнюю
+go run ./cmd/migrate down-to 0     # откатить до версии 0, то есть все
+```
+
+Частые команды есть в Makefile: `make migrate`, `make migrate-status`, `make migrate-down`.
+
+**Через goose CLI.** Умеет то же самое, и только им создаются файлы новых миграций. Ставится один раз, той же версии, что в `go.mod`:
+
+```bash
+go install -tags='no_clickhouse no_libsql no_mssql no_mysql no_sqlite3 no_vertica no_ydb' github.com/pressly/goose/v3/cmd/goose@v3.28.0
+```
+
+Теги отключают драйверы других баз, иначе сборка заметно дольше. Из папки `backend/` goose сам берёт подключение и папку миграций из `.env` (переменные `GOOSE_*`):
+
+```bash
+cd backend
+goose -s create add_brand sql      # новый файл migrations/0000N_add_brand.sql
+goose status
+goose up
+goose down
+```
+
+Файл миграции можно создать и через `make migration name=add_brand`. Флаг `-s` даёт номера `00001`, `00002` вместо даты и времени в имени.
 
 ### Проверки
 
@@ -148,8 +209,18 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 Дальше проверка занимает секунды:
 
 ```bash
-(cd backend && go test ./... && golangci-lint run)
+(cd backend && go test ./... && golangci-lint run --build-tags integration)
 ```
+
+Тесты адаптера Postgres помечены тегом `integration` и без базы не запускаются. Проще всего `make check-db`: адрес базы он берёт из `backend/.env`. Вручную, с поднятой базой:
+
+```bash
+(cd backend && TEST_DATABASE_URL=<адрес базы> go test -tags integration ./internal/adapter/postgres/)
+```
+
+Со значениями из `backend/.env.example` адрес - `postgres://stylist:stylist@localhost:55432/stylist`.
+
+Каждый тест создаёт себе отдельную схему и удаляет её после себя, так что данные разработки не пострадают.
 
 Тесты с детектором гонок (`go test -race`) заметно медленнее - их гоняет CI.
 

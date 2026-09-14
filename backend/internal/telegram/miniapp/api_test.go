@@ -7,12 +7,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/jsonfile"
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
 )
@@ -20,7 +18,7 @@ import (
 const validItemBody = `{"name":"Синее худи","description":"С капюшоном, из Uniqlo","category":"top","main_color":"blue","seasons":["autumn"],"warmth_level":2}`
 
 func TestCreateItem_SavesItem(t *testing.T) {
-	repository := jsonfile.NewItemRepository(filepath.Join(t.TempDir(), "items.json"))
+	repository := &memoryRepository{}
 	handler := NewHandler(testBotToken, service.NewWardrobe(repository))
 
 	response := serve(handler, newRequest(http.MethodPost, "/api/items", validItemBody, signedInitData(testBotToken, 42, time.Now())))
@@ -54,7 +52,7 @@ func TestCreateItem_MapsErrors(t *testing.T) {
 	}{
 		{"невалидная вещь", fmt.Errorf("добавление вещи: %w", domain.ErrInvalidItem), http.StatusUnprocessableEntity, "invalid_item"},
 		{"гардероб полон", fmt.Errorf("добавление вещи: %w", service.ErrWardrobeFull), http.StatusConflict, "wardrobe_full"},
-		{"сбой хранилища", errors.New("диск недоступен"), http.StatusInternalServerError, "internal"},
+		{"сбой хранилища", errors.New("база недоступна"), http.StatusInternalServerError, "internal"},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -118,6 +116,26 @@ func TestOptions_ListsDomainValues(t *testing.T) {
 			t.Errorf("у зонта не должно быть уровня теплоты")
 		}
 	}
+}
+
+type memoryRepository struct {
+	items []domain.Item
+}
+
+func (repository *memoryRepository) Create(_ context.Context, item domain.Item) (domain.Item, error) {
+	item.ID = int64(len(repository.items) + 1)
+	repository.items = append(repository.items, item)
+	return item, nil
+}
+
+func (repository *memoryRepository) CountByUser(_ context.Context, userID int64) (int, error) {
+	count := 0
+	for _, item := range repository.items {
+		if item.UserID == userID {
+			count++
+		}
+	}
+	return count, nil
 }
 
 type failingAdder struct {

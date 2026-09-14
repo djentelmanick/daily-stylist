@@ -3,14 +3,17 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io/fs"
+	"log"
 	"os"
 	"strings"
+
+	"github.com/joho/godotenv"
 )
 
 const (
 	defaultBotListenAddr = ":2000"
 	defaultWebhookPath   = "/telegram/webhook"
-	defaultItemsFile     = "data/items.json"
 )
 
 type Bot struct {
@@ -19,7 +22,7 @@ type Bot struct {
 	WebhookPath    string
 	WebhookSecret  string
 	ListenAddr     string
-	ItemsFile      string
+	DatabaseURL    string
 }
 
 func LoadBot() (Bot, error) {
@@ -31,13 +34,41 @@ func LoadBot() (Bot, error) {
 		WebhookPath:    env.optional("TELEGRAM_WEBHOOK_PATH", defaultWebhookPath),
 		WebhookSecret:  env.required("TELEGRAM_WEBHOOK_SECRET"),
 		ListenAddr:     env.optional("BOT_LISTEN_ADDR", defaultBotListenAddr),
-		ItemsFile:      env.optional("ITEMS_FILE", defaultItemsFile),
+		DatabaseURL:    env.required("DATABASE_URL"),
 	}
 	if err := env.err(); err != nil {
 		return Bot{}, err
 	}
 
 	return cfg, nil
+}
+
+type Migrate struct {
+	DatabaseURL string
+}
+
+func LoadMigrate() (Migrate, error) {
+	var env envReader
+
+	cfg := Migrate{
+		DatabaseURL: env.required("DATABASE_URL"),
+	}
+	if err := env.err(); err != nil {
+		return Migrate{}, err
+	}
+
+	return cfg, nil
+}
+
+func LoadDotEnv() {
+	err := godotenv.Load()
+	switch {
+	case err == nil:
+	case errors.Is(err, fs.ErrNotExist):
+		log.Println(".env не найден, читаю переменные окружения")
+	default:
+		log.Printf("не удалось прочитать .env: %v", err)
+	}
 }
 
 var ErrMissingEnv = errors.New("не заданы обязательные переменные окружения")
