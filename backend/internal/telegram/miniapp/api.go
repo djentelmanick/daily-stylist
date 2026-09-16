@@ -24,12 +24,25 @@ type wardrobe interface {
 	DeleteItems(ctx context.Context, userID int64, itemIDs []int64) error
 }
 
-type endpoints struct {
-	wardrobe wardrobe
+type recommender interface {
+	Recommend(ctx context.Context, userID int64) (service.Recommendation, error)
+	TodayOutfit(ctx context.Context, userID int64) ([]domain.Item, error)
+	WearToday(ctx context.Context, userID int64, itemIDs []int64) error
 }
 
-func NewHandler(botToken string, wardrobe wardrobe) http.Handler {
-	api := &endpoints{wardrobe: wardrobe}
+type locations interface {
+	SearchCities(ctx context.Context, query string) ([]domain.Location, error)
+	SetLocation(ctx context.Context, userID int64, location domain.Location) error
+}
+
+type endpoints struct {
+	wardrobe    wardrobe
+	recommender recommender
+	locations   locations
+}
+
+func NewHandler(botToken string, wardrobe wardrobe, recommender recommender, locations locations) http.Handler {
+	api := &endpoints{wardrobe: wardrobe, recommender: recommender, locations: locations}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/options", api.options)
@@ -39,6 +52,11 @@ func NewHandler(botToken string, wardrobe wardrobe) http.Handler {
 	mux.HandleFunc("PUT /api/items/{id}/status", api.changeItemStatus)
 	// Не DELETE с телом: тело у DELETE не определено стандартом, и прокси вправе его выбросить.
 	mux.HandleFunc("POST /api/items/delete", api.deleteItems)
+	mux.HandleFunc("GET /api/recommendation", api.recommend)
+	mux.HandleFunc("GET /api/outfits/today", api.todayOutfit)
+	mux.HandleFunc("PUT /api/outfits/today", api.wearToday)
+	mux.HandleFunc("GET /api/cities", api.searchCities)
+	mux.HandleFunc("PUT /api/city", api.setCity)
 
 	return requireUser(botToken, mux)
 }
@@ -287,6 +305,14 @@ func writeFailure(writer http.ResponseWriter, err error) {
 		writeError(writer, http.StatusNotFound, "not_found")
 	case errors.Is(err, service.ErrWardrobeFull):
 		writeError(writer, http.StatusConflict, "wardrobe_full")
+	case errors.Is(err, domain.ErrInvalidLocation):
+		log.Printf("miniapp: %v", err)
+		writeError(writer, http.StatusUnprocessableEntity, "invalid_location")
+	case errors.Is(err, service.ErrLocationNotSet):
+		writeError(writer, http.StatusConflict, "location_not_set")
+	case errors.Is(err, service.ErrWeatherUnavailable):
+		log.Printf("miniapp: %v", err)
+		writeError(writer, http.StatusBadGateway, "weather_unavailable")
 	default:
 		log.Printf("miniapp: %v", err)
 		writeError(writer, http.StatusInternalServerError, "internal")

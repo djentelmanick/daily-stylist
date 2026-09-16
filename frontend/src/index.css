@@ -226,6 +226,81 @@ h1 {
   outline: 2px solid var(--accent);
 }
 
+.item-row-static {
+  cursor: default;
+}
+
+.item-row-static:active {
+  transform: none;
+}
+
+.today-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.today-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.today-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--bg);
+  font-size: 15px;
+}
+
+.weather-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 16px;
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+.weather-city {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.weather-temperature {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.outfit {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.notes {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 12px 12px 12px 32px;
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 15px;
+}
+
 .item-row-text {
   display: flex;
   flex: 1;
@@ -282,6 +357,11 @@ h1 {
   background: var(--bg);
   color: var(--hint);
   font-size: 13px;
+}
+
+.badge-worn {
+  background: var(--accent);
+  color: var(--accent-text);
 }
 
 .status-card {
@@ -383,6 +463,11 @@ h1 {
 
 .button-danger {
   color: var(--danger);
+}
+
+.button-accent {
+  background: var(--accent);
+  color: var(--accent-text);
 }
 
 .button:disabled {
