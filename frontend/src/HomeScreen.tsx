@@ -1,16 +1,18 @@
 import type { Item } from './api'
 import { items, texts } from './texts'
-import { Swatch } from './ui'
+import { ItemAvatar } from './ui'
 
 export function HomeScreen({
   itemCount,
   todayItems,
+  onOpenItem,
   onOpenWardrobe,
   onAddItem,
   onRecommend,
 }: {
   itemCount: number
   todayItems: Item[]
+  onOpenItem: (itemId: number) => void
   onOpenWardrobe: () => void
   onAddItem: () => void
   onRecommend: () => void
@@ -29,9 +31,11 @@ export function HomeScreen({
           <p className="hint">{texts.todayOutfit}</p>
           <ul className="today-items">
             {todayItems.map((item) => (
-              <li key={item.id} className="today-item">
-                <Swatch color={item.main_color} />
-                {item.name}
+              <li key={item.id}>
+                <button type="button" className="today-item" onClick={() => onOpenItem(item.id)}>
+                  <ItemAvatar item={item} />
+                  {item.name}
+                </button>
               </li>
             ))}
           </ul>

@@ -2,13 +2,14 @@ import { useState, type ReactNode } from 'react'
 import { changeItemStatus, deleteItems, labelOf, type Item, type Options } from './api'
 import { confirm, useBackButton } from './telegram'
 import { errorText, texts } from './texts'
-import { Swatch } from './ui'
+import { ItemMark, Swatch } from './ui'
 
 export function ItemScreen({
   options,
   item,
   onBack,
   onEdit,
+  onOpenPhoto,
   onChanged,
   onDeleted,
 }: {
@@ -16,6 +17,7 @@ export function ItemScreen({
   item: Item
   onBack: () => void
   onEdit: () => void
+  onOpenPhoto: () => void
   onChanged: (item: Item) => void
   onDeleted: () => void
 }) {
@@ -58,9 +60,25 @@ export function ItemScreen({
 
   return (
     <div className="screen">
-      <header>
-        <h1>{item.name}</h1>
-        {item.description !== '' && <p className="hint">{item.description}</p>}
+      <header className="item-header">
+        {item.photo_url === '' ? (
+          <span className="item-header-mark">
+            <ItemMark item={item} />
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="item-header-mark item-header-photo"
+            aria-label={texts.photo}
+            onClick={onOpenPhoto}
+          >
+            <ItemMark item={item} />
+          </button>
+        )}
+        <div className="item-header-text">
+          <h1>{item.name}</h1>
+          {item.description !== '' && <p className="hint">{item.description}</p>}
+        </div>
       </header>
 
       <section className="status-card">
@@ -117,6 +135,17 @@ export function ItemScreen({
           {texts.delete}
         </button>
       </div>
+    </div>
+  )
+}
+
+export function PhotoScreen({ item, onBack }: { item: Item; onBack: () => void }) {
+  useBackButton(onBack)
+
+  return (
+    <div className="screen photo-screen">
+      <img src={item.photo_url} alt={item.name} />
+      <p className="hint">{item.name}</p>
     </div>
   )
 }

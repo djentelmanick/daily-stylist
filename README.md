@@ -35,6 +35,7 @@
 | Бот, бизнес-логика, работа с базой | Go |
 | Mini App: добавление и просмотр гардероба | React |
 | Хранилище | PostgreSQL |
+| Фотографии вещей | SeaweedFS, доступ по протоколу S3 |
 | Состояние диалогов, кэш погоды | Redis |
 | Распознавание одежды и коллаж | Python + FastAPI, отдельный сервис |
 
@@ -54,14 +55,14 @@ backend/                  # Go: бот, логика, база
 │   ├── config/           # настройки из переменных окружения
 │   ├── domain/           # сущности и правила подбора одежды
 │   ├── service/          # сценарии приложения и объявления портов
-│   ├── adapter/          # реализации портов: postgres, погода, vision
+│   ├── adapter/          # реализации портов: postgres, хранилище фото, погода, vision
 │   └── telegram/         # всё, что видит пользователь: хендлеры бота, API Mini App, тексты
 └── migrations/           # SQL-миграции
 
 frontend/                 # React: Mini App для гардероба
 vision/                   # Python: распознавание и коллаж (позже)
 contracts/                # OpenAPI-договор между Go и Python
-deploy/                   # docker-compose: postgres, redis, бот, планировщик, vision
+deploy/                   # docker-compose: postgres, хранилище фото, redis, бот, планировщик, vision
 docs/                     # решения по архитектуре и причины, по которым они приняты
 ```
 
@@ -109,6 +110,8 @@ docker compose --env-file backend/.env -f deploy/docker-compose.yml up -d --wait
 
 Логин, пароль и порт базы compose берёт из `backend/.env`, а `DATABASE_URL` там собирается из них же. Данные переживают перезапуск контейнера.
 
+Вместе с базой поднимается [SeaweedFS](https://github.com/seaweedfs/seaweedfs) - хранилище фотографий вещей с доступом по протоколу S3. Ключи и порт он тоже берёт из `backend/.env`, а бакет `S3_BUCKET` создаётся сам при первой загрузке файла. Посмотреть, что в нём лежит, можно в файловом браузере: http://localhost:58888.
+
 Затем накатите миграции. Бот сам этого не делает и без них не запустится:
 
 ```bash
@@ -130,6 +133,8 @@ docker compose --env-file backend/.env -f deploy/docker-compose.yml up -d --wait
    ```
    TELEGRAM_WEBHOOK_BASE_URL=https://xxxx.ngrok-free.app
    ```
+
+   Этот же адрес бот подставляет в ссылки на фотографии: `S3_PUBLIC_URL` в `.env.example` собирается из него.
 
 2. Бэкенд. Запускается из папки `backend/`, иначе не найдёт `.env`:
 
@@ -153,13 +158,14 @@ docker compose --env-file backend/.env -f deploy/docker-compose.yml exec postgre
 
 и в ней `SELECT id, user_id, name, category FROM items;`.
 
-Как это связано: снаружи виден только туннель на Vite (порт 5173). Vite отдаёт страницу Mini App, а запросы к `/api` и `/telegram` пересылает Go-серверу на порт 2000.
+Как это связано: снаружи виден только туннель на Vite (порт 5173). Vite отдаёт страницу Mini App, запросы к `/api` и `/telegram` пересылает Go-серверу на порт 2000, а запросы к `/photos` - в хранилище на порт 58333. Фотографии идут мимо бота: он только выдаёт браузеру подписанные ссылки, по которым тот сам кладёт и забирает файлы.
 
 ### Если что-то не работает
 
 - **Адрес ngrok меняется при каждом перезапуске.** Обновите `TELEGRAM_WEBHOOK_BASE_URL`, перезапустите бэкенд и заново укажите адрес в BotFather. Чтобы не делать этого каждый раз, возьмите в ngrok бесплатный постоянный домен.
 - **ngrok показывает страницу-предупреждение.** Нажмите «Visit Site».
 - **Бот пишет «есть непримененные миграции».** После `git pull` появились новые миграции: выполните `(cd backend && go run ./cmd/migrate up)`.
+- **Фотография не загружается, а в консоли браузера ошибка 403.** Адрес туннеля сменился, а `S3_PUBLIC_URL` остался старым: подпись ссылки считается от адреса и со старым не сходится. Обновите `TELEGRAM_WEBHOOK_BASE_URL` и перезапустите бэкенд.
 - **`make check-db` пишет `database "stylist_test" does not exist`.** Том базы создан раньше, чем появился скрипт, который её создаёт. Один раз выполните в `make psql`: `CREATE DATABASE stylist_test;`.
 
 ### Миграции
@@ -213,11 +219,13 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 (cd backend && go test ./... && golangci-lint run --build-tags integration)
 ```
 
-Тесты адаптера Postgres помечены тегом `integration` и без базы не запускаются. Работают они в отдельной базе `stylist_test` в том же контейнере, рабочие данные не видят. Проще всего `make check-db`: адрес он берёт из `TEST_DATABASE_URL` в `backend/.env`. Вручную, с поднятой базой:
+Тесты адаптеров Postgres и хранилища помечены тегом `integration` и без базы не запускаются. Работают они в отдельной базе `stylist_test` в том же контейнере, рабочие данные не видят. Проще всего `make check-db`: адрес он берёт из `TEST_DATABASE_URL` в `backend/.env`. Вручную, с поднятой базой:
 
 ```bash
 (cd backend && TEST_DATABASE_URL=<адрес базы> go test -count=1 -tags integration ./internal/adapter/postgres/)
 ```
+
+Так же устроены тесты хранилища: `make check-s3` гоняет их в отдельном бакете `photos-test` из `TEST_S3_BUCKET`, рабочие фотографии они не видят. Фейком эти тесты не заменить: проверяют они как раз то, принимает ли живое хранилище подписанные ссылки - с привязанными размером и типом файла и без подписи.
 
 `-count=1` отключает кэш результатов: без него Go покажет `ok (cached)`, даже если база выключена, потому что код с прошлого запуска не менялся.
 

@@ -3,8 +3,9 @@ import { fetchItems, fetchOptions, fetchTodayOutfit, type Item, type Options } f
 import { CityScreen } from './CityScreen'
 import { HomeScreen } from './HomeScreen'
 import { AddItemScreen, EditItemScreen } from './ItemFormScreens'
-import { ItemScreen } from './ItemScreen'
-import { RecommendationScreen } from './RecommendationScreen'
+import { ItemScreen, PhotoScreen } from './ItemScreen'
+import { RecommendationScreen, type RecommendationMemory } from './RecommendationScreen'
+import { recall, remember } from './session'
 import { getInitData, useBackButton } from './telegram'
 import { errorTexts, texts } from './texts'
 import { WardrobeScreen } from './WardrobeScreen'
@@ -59,9 +60,23 @@ type Screen =
   | { kind: 'wardrobe' }
   | { kind: 'item'; itemId: number }
   | { kind: 'edit'; itemId: number }
+  | { kind: 'photo'; itemId: number }
   | { kind: 'add' }
   | { kind: 'recommendation' }
   | { kind: 'city' }
+
+const screenKinds = ['home', 'wardrobe', 'item', 'edit', 'photo', 'add', 'recommendation', 'city']
+const openScreens = 'screens'
+
+// Телефон и Telegram перезагружают страницу когда угодно - например, пока открыт
+// выбор фотографии. Без этого пользователь возвращался бы на главный экран.
+function restoreScreens(): Screen[] {
+  const stored = recall<Screen[]>(openScreens)
+  if (stored === null || stored.length === 0 || !stored.every((screen) => screenKinds.includes(screen?.kind))) {
+    return [{ kind: 'home' }]
+  }
+  return stored
+}
 
 // Экраны лежат стопкой: открыть - положить сверху, «Назад» - снять верхний.
 // Все изменения идут через приложение, поэтому список вещей загружается один раз и дальше правится на месте.
@@ -76,8 +91,13 @@ function Screens({
 }) {
   const [items, setItems] = useState(initialItems)
   const [todayOutfit, setTodayOutfit] = useState(initialTodayOutfit)
-  const [stack, setStack] = useState<Screen[]>([{ kind: 'home' }])
+  const recommendation = useRef<RecommendationMemory>({ recommendation: null, index: 0 })
+  const [stack, setStack] = useState<Screen[]>(restoreScreens)
   const screen = stack[stack.length - 1]
+
+  useEffect(() => {
+    remember(openScreens, stack)
+  }, [stack])
 
   const savedScroll = useRef<number[]>([])
   const nextScroll = useRef(0)
@@ -97,11 +117,17 @@ function Screens({
   }
 
   function replaceItem(updated: Item) {
+    forgetRecommendation()
     setItems((current) => current.map((item) => (item.id === updated.id ? updated : item)))
   }
 
   function removeItems(itemIds: number[]) {
+    forgetRecommendation()
     setItems((current) => current.filter((item) => !itemIds.includes(item.id)))
+  }
+
+  function forgetRecommendation() {
+    recommendation.current = { recommendation: null, index: 0 }
   }
 
   switch (screen.kind) {
@@ -110,6 +136,7 @@ function Screens({
         <HomeScreen
           itemCount={items.length}
           todayItems={todayOutfit.flatMap((itemId) => items.filter((item) => item.id === itemId))}
+          onOpenItem={(itemId) => open({ kind: 'item', itemId })}
           onOpenWardrobe={() => open({ kind: 'wardrobe' })}
           onAddItem={() => open({ kind: 'add' })}
           onRecommend={() => open({ kind: 'recommendation' })}
@@ -132,25 +159,39 @@ function Screens({
         <AddItemScreen
           options={options}
           onBack={back}
-          onAdded={(item) => setItems((current) => [item, ...current])}
+          onAdded={(item) => {
+            forgetRecommendation()
+            setItems((current) => [item, ...current])
+          }}
         />
       )
     case 'recommendation':
       return (
         <RecommendationScreen
           options={options}
+          memory={recommendation.current}
           wornItemIds={todayOutfit}
           onWorn={setTodayOutfit}
           onBack={back}
+          onOpenItem={(itemId) => open({ kind: 'item', itemId })}
           onChooseCity={() => open({ kind: 'city' })}
           onAddItem={() => open({ kind: 'add' })}
         />
       )
     case 'city':
-      return <CityScreen onBack={back} onSaved={back} />
+      return (
+        <CityScreen
+          onBack={back}
+          onSaved={() => {
+            forgetRecommendation()
+            back()
+          }}
+        />
+      )
 
     case 'item':
-    case 'edit': {
+    case 'edit':
+    case 'photo': {
       const item = items.find((candidate) => candidate.id === screen.itemId)
       if (item === undefined) {
         return (
@@ -158,6 +199,9 @@ function Screens({
             <p className="message">{errorTexts.not_found}</p>
           </WithBackButton>
         )
+      }
+      if (screen.kind === 'photo') {
+        return <PhotoScreen item={item} onBack={back} />
       }
       if (screen.kind === 'edit') {
         return (
@@ -178,6 +222,7 @@ function Screens({
           item={item}
           onBack={back}
           onEdit={() => open({ kind: 'edit', itemId: item.id })}
+          onOpenPhoto={() => open({ kind: 'photo', itemId: item.id })}
           onChanged={replaceItem}
           onDeleted={() => {
             removeItems([item.id])

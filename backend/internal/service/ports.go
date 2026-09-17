@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	ErrItemNotFound   = errors.New("вещь не найдена")
-	ErrLocationNotSet = errors.New("город не выбран")
+	ErrItemNotFound     = errors.New("вещь не найдена")
+	ErrLocationNotSet   = errors.New("город не выбран")
+	ErrPhotoNotUploaded = errors.New("фотография не загружена")
 )
 
 type ItemRepository interface {
@@ -20,7 +21,25 @@ type ItemRepository interface {
 	Get(ctx context.Context, userID, itemID int64) (domain.Item, error)
 	Update(ctx context.Context, item domain.Item) error
 	UpdateStatus(ctx context.Context, userID, itemID int64, status domain.ItemStatus) error
-	Delete(ctx context.Context, userID int64, itemIDs []int64) error
+	Delete(ctx context.Context, userID int64, itemIDs []int64) ([]string, error)
+}
+
+type PhotoUploadRepository interface {
+	Create(ctx context.Context, userID int64, key string) error
+	Take(ctx context.Context, userID int64, key string) error
+	TakeOlderThan(ctx context.Context, userID int64, before time.Time) ([]string, error)
+}
+
+type PhotoInfo struct {
+	Size        int64
+	ContentType string
+}
+
+type PhotoStorage interface {
+	UploadLink(ctx context.Context, key, contentType string, size int64, ttl time.Duration) (string, error)
+	DownloadLink(ctx context.Context, key string, ttl time.Duration) (string, error)
+	Describe(ctx context.Context, key string) (PhotoInfo, error)
+	Delete(ctx context.Context, keys []string) error
 }
 
 type LocationRepository interface {

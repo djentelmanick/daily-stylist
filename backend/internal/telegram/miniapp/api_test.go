@@ -20,7 +20,7 @@ const validItemBody = `{"name":"Синее худи","description":"С капю�
 
 func TestCreateItem_SavesItem(t *testing.T) {
 	repository := &memoryRepository{}
-	handler := newHandler(service.NewWardrobe(repository))
+	handler := newHandler(service.NewWardrobe(repository, &stubPhotos{}))
 
 	response := serve(handler, newRequest(http.MethodPost, "/api/items", validItemBody, signedInitData(testBotToken, 42, time.Now())))
 
@@ -45,7 +45,7 @@ func TestCreateItem_SavesItem(t *testing.T) {
 }
 
 func TestListItems_ReturnsOnlyOwnItems(t *testing.T) {
-	handler := newHandler(service.NewWardrobe(&memoryRepository{}))
+	handler := newHandler(service.NewWardrobe(&memoryRepository{}, &stubPhotos{}))
 	createAs(t, handler, 42)
 	createAs(t, handler, 7)
 	createAs(t, handler, 42)
@@ -56,7 +56,7 @@ func TestListItems_ReturnsOnlyOwnItems(t *testing.T) {
 }
 
 func TestListItems_EmptyWardrobeIsEmptyArray(t *testing.T) {
-	handler := newHandler(service.NewWardrobe(&memoryRepository{}))
+	handler := newHandler(service.NewWardrobe(&memoryRepository{}, &stubPhotos{}))
 
 	response := serve(handler, newRequest(http.MethodGet, "/api/items", "", signedInitData(testBotToken, 42, time.Now())))
 
@@ -66,7 +66,7 @@ func TestListItems_EmptyWardrobeIsEmptyArray(t *testing.T) {
 }
 
 func TestEditItem_ChangesFieldsAndKeepsStatus(t *testing.T) {
-	handler := newHandler(service.NewWardrobe(&memoryRepository{}))
+	handler := newHandler(service.NewWardrobe(&memoryRepository{}, &stubPhotos{}))
 	itemID := createAs(t, handler, 42)
 	initData := signedInitData(testBotToken, 42, time.Now())
 	serve(handler, newRequest(http.MethodPut, itemPath(itemID)+"/status", `{"status":"dirty"}`, initData))
@@ -88,7 +88,7 @@ func TestEditItem_ChangesFieldsAndKeepsStatus(t *testing.T) {
 
 func TestChangeItemStatus(t *testing.T) {
 	repository := &memoryRepository{}
-	handler := newHandler(service.NewWardrobe(repository))
+	handler := newHandler(service.NewWardrobe(repository, &stubPhotos{}))
 	itemID := createAs(t, handler, 42)
 	initData := signedInitData(testBotToken, 42, time.Now())
 
@@ -105,7 +105,7 @@ func TestChangeItemStatus(t *testing.T) {
 }
 
 func TestItemRoutes_HideOtherUsersItems(t *testing.T) {
-	handler := newHandler(service.NewWardrobe(&memoryRepository{}))
+	handler := newHandler(service.NewWardrobe(&memoryRepository{}, &stubPhotos{}))
 	itemID := createAs(t, handler, 42)
 	stranger := signedInitData(testBotToken, 7, time.Now())
 
@@ -130,7 +130,7 @@ func TestItemRoutes_HideOtherUsersItems(t *testing.T) {
 }
 
 func TestDeleteItems_DeletesOnlyOwnItems(t *testing.T) {
-	handler := newHandler(service.NewWardrobe(&memoryRepository{}))
+	handler := newHandler(service.NewWardrobe(&memoryRepository{}, &stubPhotos{}))
 	first := createAs(t, handler, 42)
 	second := createAs(t, handler, 42)
 	strangers := createAs(t, handler, 7)
@@ -291,17 +291,54 @@ func (repository *memoryRepository) UpdateStatus(_ context.Context, userID, item
 	return nil
 }
 
-func (repository *memoryRepository) Delete(_ context.Context, userID int64, itemIDs []int64) error {
+func (repository *memoryRepository) Delete(_ context.Context, userID int64, itemIDs []int64) ([]string, error) {
+	var photoKeys []string
 	repository.items = slices.DeleteFunc(repository.items, func(item domain.Item) bool {
-		return item.UserID == userID && slices.Contains(itemIDs, item.ID)
+		if item.UserID != userID || !slices.Contains(itemIDs, item.ID) {
+			return false
+		}
+		photoKeys = append(photoKeys, item.PhotoKey)
+		return true
 	})
-	return nil
+	return photoKeys, nil
 }
 
 func (repository *memoryRepository) find(userID, itemID int64) int {
 	return slices.IndexFunc(repository.items, func(item domain.Item) bool {
 		return item.UserID == userID && item.ID == itemID
 	})
+}
+
+type stubPhotos struct {
+	confirmed  []string
+	discarded  []string
+	confirmErr error
+	uploadErr  error
+}
+
+func (photos *stubPhotos) RequestUpload(_ context.Context, userID int64, contentType string, _ int64) (service.PhotoUpload, error) {
+	if photos.uploadErr != nil {
+		return service.PhotoUpload{}, photos.uploadErr
+	}
+	key := fmt.Sprintf("users/%d/photo%s", userID, strings.TrimPrefix(contentType, "image/"))
+	link := "https://storage.example/" + key + "?signature=..."
+	return service.PhotoUpload{Key: key, URL: link, ViewURL: link}, nil
+}
+
+func (photos *stubPhotos) Link(_ context.Context, key string) (string, error) {
+	return "https://storage.example/" + key + "?signature=...", nil
+}
+
+func (photos *stubPhotos) Confirm(_ context.Context, _ int64, key string) error {
+	if photos.confirmErr != nil {
+		return photos.confirmErr
+	}
+	photos.confirmed = append(photos.confirmed, key)
+	return nil
+}
+
+func (photos *stubPhotos) Discard(_ context.Context, keys ...string) {
+	photos.discarded = append(photos.discarded, keys...)
 }
 
 type failingWardrobe struct {

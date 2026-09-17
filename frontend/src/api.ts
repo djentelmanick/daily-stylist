@@ -24,6 +24,7 @@ export type Options = {
   limits: {
     name: number
     description: number
+    photo_bytes: number
   }
 }
 
@@ -36,11 +37,13 @@ export type ItemFields = {
   seasons: string[]
   warmth_level: number
   waterproof: boolean
+  photo_key: string
 }
 
 export type Item = ItemFields & {
   id: number
   status: string
+  photo_url: string
 }
 
 export const availableStatus = 'available'
@@ -77,6 +80,10 @@ export type ApiErrorCode =
   | 'invalid_location'
   | 'location_not_set'
   | 'weather_unavailable'
+  | 'photo_too_large'
+  | 'photo_type_unsupported'
+  | 'photo_not_uploaded'
+  | 'photo_upload_failed'
   | 'internal'
   | 'network'
 
@@ -89,6 +96,9 @@ const serverErrorCodes: ApiErrorCode[] = [
   'invalid_location',
   'location_not_set',
   'weather_unavailable',
+  'photo_too_large',
+  'photo_type_unsupported',
+  'photo_not_uploaded',
   'internal',
 ]
 
@@ -128,6 +138,29 @@ export function changeItemStatus(itemId: number, status: string): Promise<void> 
 
 export function deleteItems(itemIds: number[]): Promise<void> {
   return request<void>('POST', '/api/items/delete', { ids: itemIds })
+}
+
+export type UploadedPhoto = {
+  key: string
+  url: string
+}
+
+export async function uploadPhoto(file: File): Promise<UploadedPhoto> {
+  const upload = await request<{ key: string; upload_url: string; view_url: string }>('POST', '/api/photos', {
+    content_type: file.type,
+    size: file.size,
+  })
+
+  let response: Response
+  try {
+    response = await fetch(upload.upload_url, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } })
+  } catch {
+    throw new ApiError('network')
+  }
+  if (!response.ok) {
+    throw new ApiError('photo_upload_failed')
+  }
+  return { key: upload.key, url: upload.view_url }
 }
 
 export function fetchRecommendation(): Promise<Recommendation> {

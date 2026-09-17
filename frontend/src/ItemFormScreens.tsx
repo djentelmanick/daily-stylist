@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { createItem, updateItem, type Item, type ItemFields, type Options } from './api'
-import { ItemForm } from './ItemForm'
+import { forgetDraft, ItemForm } from './ItemForm'
 import { useBackButton } from './telegram'
 import { texts } from './texts'
+
+const newItemDraft = 'draft:new-item'
 
 export function AddItemScreen({
   options,
@@ -13,7 +15,10 @@ export function AddItemScreen({
   onBack: () => void
   onAdded: (item: Item) => void
 }) {
-  useBackButton(onBack)
+  useBackButton(() => {
+    forgetDraft(newItemDraft)
+    onBack()
+  })
   const [formKey, setFormKey] = useState(0)
   const [addedName, setAddedName] = useState('')
 
@@ -31,6 +36,7 @@ export function AddItemScreen({
       options={options}
       title={texts.newItemTitle}
       submitText={texts.add}
+      draftKey={newItemDraft}
       notice={addedName === '' ? undefined : texts.added(addedName)}
       onSubmit={add}
     />
@@ -48,13 +54,24 @@ export function EditItemScreen({
   onBack: () => void
   onSaved: (item: Item) => void
 }) {
-  useBackButton(onBack)
+  const draftKey = `draft:item:${item.id}`
+  useBackButton(() => {
+    forgetDraft(draftKey)
+    onBack()
+  })
 
   async function save(fields: ItemFields) {
     onSaved(await updateItem(item.id, fields))
   }
 
   return (
-    <ItemForm options={options} title={texts.editItemTitle} submitText={texts.save} initial={item} onSubmit={save} />
+    <ItemForm
+      options={options}
+      title={texts.editItemTitle}
+      submitText={texts.save}
+      draftKey={draftKey}
+      initial={item}
+      onSubmit={save}
+    />
   )
 }

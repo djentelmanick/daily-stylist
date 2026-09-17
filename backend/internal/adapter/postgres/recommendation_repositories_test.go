@@ -71,7 +71,7 @@ func TestOutfitRepository_History(t *testing.T) {
 	checkWornOn(t, outfits, 1, wednesday)
 	checkWornOn(t, outfits, 2, tuesday)
 
-	if err := items.Delete(t.Context(), 1, []int64{dress.ID}); err != nil {
+	if _, err := items.Delete(t.Context(), 1, []int64{dress.ID}); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
 	checkLastWorn(t, outfits, 1, monday, wednesday, map[int64]time.Time{shirt.ID: monday, jeans.ID: monday})

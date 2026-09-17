@@ -26,6 +26,7 @@ type Item struct {
 	Seasons     []Season
 	WarmthLevel WarmthLevel
 	Waterproof  bool
+	PhotoKey    string
 	Status      ItemStatus
 }
 
@@ -38,6 +39,7 @@ type NewItemParams struct {
 	Seasons     []Season
 	WarmthLevel WarmthLevel
 	Waterproof  bool
+	PhotoKey    string
 }
 
 func NewItem(params NewItemParams) (Item, error) {
@@ -50,6 +52,7 @@ func NewItem(params NewItemParams) (Item, error) {
 		Seasons:     params.Seasons,
 		WarmthLevel: params.WarmthLevel,
 		Waterproof:  params.Waterproof,
+		PhotoKey:    params.PhotoKey,
 		Status:      ItemStatusAvailable,
 	}
 	if err := item.Validate(); err != nil {
@@ -66,6 +69,7 @@ type EditItemParams struct {
 	Seasons     []Season
 	WarmthLevel WarmthLevel
 	Waterproof  bool
+	PhotoKey    string
 }
 
 func (item Item) Edit(params EditItemParams) (Item, error) {
@@ -76,6 +80,7 @@ func (item Item) Edit(params EditItemParams) (Item, error) {
 	item.Seasons = params.Seasons
 	item.WarmthLevel = params.WarmthLevel
 	item.Waterproof = params.Waterproof
+	item.PhotoKey = params.PhotoKey
 	if err := item.Validate(); err != nil {
 		return Item{}, err
 	}

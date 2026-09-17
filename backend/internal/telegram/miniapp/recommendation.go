@@ -53,7 +53,7 @@ func (api *endpoints) recommend(writer http.ResponseWriter, request *http.Reques
 	for index, outfit := range recommendation.Outfits {
 		items := make([]itemResponse, len(outfit.Items))
 		for itemIndex, item := range outfit.Items {
-			items[itemIndex] = toItemResponse(item)
+			items[itemIndex] = api.toItemResponse(request.Context(), item)
 		}
 		response.Outfits[index] = outfitResponse{Items: items, Notes: noteTexts(outfit.Notes)}
 	}

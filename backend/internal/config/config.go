@@ -14,6 +14,7 @@ import (
 const (
 	defaultBotListenAddr = ":2000"
 	defaultWebhookPath   = "/telegram/webhook"
+	defaultS3Region      = "us-east-1"
 )
 
 type Bot struct {
@@ -23,6 +24,16 @@ type Bot struct {
 	WebhookSecret  string
 	ListenAddr     string
 	DatabaseURL    string
+	Photos         PhotoStorage
+}
+
+type PhotoStorage struct {
+	Endpoint  string
+	PublicURL string
+	Region    string
+	Bucket    string
+	AccessKey string
+	SecretKey string
 }
 
 func LoadBot() (Bot, error) {
@@ -35,6 +46,14 @@ func LoadBot() (Bot, error) {
 		WebhookSecret:  env.required("TELEGRAM_WEBHOOK_SECRET"),
 		ListenAddr:     env.optional("BOT_LISTEN_ADDR", defaultBotListenAddr),
 		DatabaseURL:    env.required("DATABASE_URL"),
+		Photos: PhotoStorage{
+			Endpoint:  env.required("S3_ENDPOINT"),
+			PublicURL: env.required("S3_PUBLIC_URL"),
+			Region:    env.optional("S3_REGION", defaultS3Region),
+			Bucket:    env.required("S3_BUCKET"),
+			AccessKey: env.required("S3_ACCESS_KEY"),
+			SecretKey: env.required("S3_SECRET_KEY"),
+		},
 	}
 	if err := env.err(); err != nil {
 		return Bot{}, err

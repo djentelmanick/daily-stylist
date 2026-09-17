@@ -53,6 +53,7 @@ func TestItemRepository_CreateStoresEveryField(t *testing.T) {
 		Seasons:     []domain.Season{domain.SeasonSpring, domain.SeasonAutumn},
 		WarmthLevel: domain.WarmthLevelMedium,
 		Waterproof:  true,
+		PhotoKey:    "users/7/dozhdevik.jpg",
 	})
 	if err != nil {
 		t.Fatalf("NewItem: %v", err)
@@ -73,13 +74,14 @@ func TestItemRepository_CreateStoresEveryField(t *testing.T) {
 		seasons     []string
 		warmthLevel int
 		waterproof  bool
+		photoKey    string
 		status      string
 	}
 	err = pool.QueryRow(t.Context(), `
-		SELECT user_id, name, description, category, main_color, extra_colors, seasons, warmth_level, waterproof, status
+		SELECT user_id, name, description, category, main_color, extra_colors, seasons, warmth_level, waterproof, photo_key, status
 		FROM items WHERE id = $1`, created.ID,
 	).Scan(&stored.userID, &stored.name, &stored.description, &stored.category, &stored.mainColor,
-		&stored.extraColors, &stored.seasons, &stored.warmthLevel, &stored.waterproof, &stored.status)
+		&stored.extraColors, &stored.seasons, &stored.warmthLevel, &stored.waterproof, &stored.photoKey, &stored.status)
 	if err != nil {
 		t.Fatalf("чтение строки: %v", err)
 	}
@@ -93,6 +95,7 @@ func TestItemRepository_CreateStoresEveryField(t *testing.T) {
 		!slices.Equal(stored.seasons, []string{"spring", "autumn"}) ||
 		stored.warmthLevel != 2 ||
 		!stored.waterproof ||
+		stored.photoKey != "users/7/dozhdevik.jpg" ||
 		stored.status != "available" {
 		t.Errorf("в базе = %+v", stored)
 	}
@@ -152,7 +155,7 @@ func TestItemRepository_HidesOtherUsersItems(t *testing.T) {
 	if err := repository.UpdateStatus(t.Context(), 2, item.ID, domain.ItemStatusDirty); !errors.Is(err, service.ErrItemNotFound) {
 		t.Errorf("UpdateStatus чужой вещи: ошибка = %v, ожидалась ErrItemNotFound", err)
 	}
-	if err := repository.Delete(t.Context(), 2, []int64{item.ID}); err != nil {
+	if _, err := repository.Delete(t.Context(), 2, []int64{item.ID}); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
 
@@ -203,8 +206,13 @@ func TestItemRepository_UpdateStatusAndDelete(t *testing.T) {
 		t.Errorf("после изменения = %+v", got)
 	}
 
-	if err := repository.Delete(t.Context(), 1, []int64{first.ID}); err != nil {
+	photoKeys, err := repository.Delete(t.Context(), 1, []int64{first.ID})
+	if err != nil {
 		t.Fatalf("Delete: %v", err)
+	}
+	// Ключи нужны, чтобы удалить фотографии вслед за вещами.
+	if !slices.Equal(photoKeys, []string{""}) {
+		t.Errorf("ключи фотографий = %v, у вещи без фотографии ожидался пустой ключ", photoKeys)
 	}
 	items, err := repository.ListByUser(t.Context(), 1)
 	if err != nil {

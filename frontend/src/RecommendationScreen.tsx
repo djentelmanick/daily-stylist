@@ -2,7 +2,12 @@ import { useEffect, useState } from 'react'
 import { ApiError, fetchRecommendation, labelOf, wearToday, type Options, type Recommendation } from './api'
 import { useBackButton } from './telegram'
 import { errorText, texts } from './texts'
-import { Swatch } from './ui'
+import { ItemMark } from './ui'
+
+export type RecommendationMemory = {
+  recommendation: Recommendation | null
+  index: number
+}
 
 type State =
   | { kind: 'loading' }
@@ -12,26 +17,37 @@ type State =
 
 export function RecommendationScreen({
   options,
+  memory,
   wornItemIds,
   onWorn,
   onBack,
+  onOpenItem,
   onChooseCity,
   onAddItem,
 }: {
   options: Options
+  memory: RecommendationMemory
   wornItemIds: number[]
   onWorn: (itemIds: number[]) => void
   onBack: () => void
+  onOpenItem: (itemId: number) => void
   onChooseCity: () => void
   onAddItem: () => void
 }) {
   useBackButton(onBack)
-  const [state, setState] = useState<State>({ kind: 'loading' })
+  const [state, setState] = useState<State>(() =>
+    memory.recommendation === null ? { kind: 'loading' } : { kind: 'ready', recommendation: memory.recommendation },
+  )
 
   useEffect(() => {
+    if (memory.recommendation !== null) {
+      return
+    }
+
     let cancelled = false
     fetchRecommendation()
       .then((recommendation) => {
+        memory.recommendation = recommendation
         if (!cancelled) {
           setState({ kind: 'ready', recommendation })
         }
@@ -46,7 +62,7 @@ export function RecommendationScreen({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [memory])
 
   switch (state.kind) {
     case 'loading':
@@ -68,8 +84,10 @@ export function RecommendationScreen({
         <RecommendationView
           options={options}
           recommendation={state.recommendation}
+          memory={memory}
           wornItemIds={wornItemIds}
           onWorn={onWorn}
+          onOpenItem={onOpenItem}
           onChooseCity={onChooseCity}
           onAddItem={onAddItem}
         />
@@ -80,27 +98,33 @@ export function RecommendationScreen({
 function RecommendationView({
   options,
   recommendation,
+  memory,
   wornItemIds,
   onWorn,
+  onOpenItem,
   onChooseCity,
   onAddItem,
 }: {
   options: Options
   recommendation: Recommendation
+  memory: RecommendationMemory
   wornItemIds: number[]
   onWorn: (itemIds: number[]) => void
+  onOpenItem: (itemId: number) => void
   onChooseCity: () => void
   onAddItem: () => void
 }) {
   const { city, weather, outfits } = recommendation
-  const [index, setIndex] = useState(0)
+  const [index, setIndex] = useState(memory.index)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const outfit = outfits.at(index)
   const worn = outfit !== undefined && sameItems(outfit.items.map((item) => item.id), wornItemIds)
 
   function showNext() {
-    setIndex((index + 1) % outfits.length)
+    const next = (index + 1) % outfits.length
+    memory.index = next
+    setIndex(next)
     setError('')
   }
 
@@ -149,16 +173,14 @@ function RecommendationView({
             {outfits.length > 1 && <p className="hint">{texts.outfitNumber(index + 1, outfits.length)}</p>}
             <ul className="item-list">
               {outfit.items.map((item) => (
-                <li key={item.id} className="item-row item-row-static">
-                  <span className="swatches">
-                    {[item.main_color, ...item.extra_colors].map((color) => (
-                      <Swatch key={color} color={color} />
-                    ))}
-                  </span>
-                  <span className="item-row-text">
-                    <span className="item-row-name">{item.name}</span>
-                    <span className="hint">{labelOf(options.categories, item.category)}</span>
-                  </span>
+                <li key={item.id}>
+                  <button type="button" className="item-row" onClick={() => onOpenItem(item.id)}>
+                    <ItemMark item={item} />
+                    <span className="item-row-text">
+                      <span className="item-row-name">{item.name}</span>
+                      <span className="hint">{labelOf(options.categories, item.category)}</span>
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>

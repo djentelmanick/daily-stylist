@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { availableStatus, deleteItems, labelOf, type Item, type Options } from './api'
 import { confirm, useBackButton, vibrate } from './telegram'
 import { errorText, texts } from './texts'
-import { Swatch } from './ui'
+import { ItemMark } from './ui'
 import { useLongPress } from './useLongPress'
 
 export function WardrobeScreen({
@@ -154,11 +154,7 @@ function ItemRow({
         {...press}
       >
         {checked !== null && <span className={checked ? 'checkmark checkmark-on' : 'checkmark'}>{checked && '✓'}</span>}
-        <span className="swatches">
-          {[item.main_color, ...item.extra_colors].map((color) => (
-            <Swatch key={color} color={color} />
-          ))}
-        </span>
+        <ItemMark item={item} />
         <span className="item-row-text">
           <span className="item-row-name">{item.name}</span>
           <span className="hint">{categoryLabel}</span>

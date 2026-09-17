@@ -12,13 +12,20 @@ const maxItems = 100
 
 var ErrWardrobeFull = errors.New("в гардеробе достигнут лимит вещей")
 
-type Wardrobe struct {
-	itemRepository ItemRepository
+type itemPhotos interface {
+	Confirm(ctx context.Context, userID int64, key string) error
+	Discard(ctx context.Context, keys ...string)
 }
 
-func NewWardrobe(itemRepository ItemRepository) *Wardrobe {
+type Wardrobe struct {
+	itemRepository ItemRepository
+	photos         itemPhotos
+}
+
+func NewWardrobe(itemRepository ItemRepository, photos itemPhotos) *Wardrobe {
 	return &Wardrobe{
 		itemRepository: itemRepository,
+		photos:         photos,
 	}
 }
 
@@ -44,7 +51,18 @@ func (w *Wardrobe) AddItem(ctx context.Context, params domain.NewItemParams) (it
 		return domain.Item{}, err
 	}
 
-	return w.itemRepository.Create(ctx, item)
+	if item.PhotoKey != "" {
+		if err := w.photos.Confirm(ctx, params.UserID, item.PhotoKey); err != nil {
+			return domain.Item{}, err
+		}
+	}
+
+	item, err = w.itemRepository.Create(ctx, item)
+	if err != nil {
+		w.photos.Discard(ctx, params.PhotoKey)
+		return domain.Item{}, err
+	}
+	return item, nil
 }
 
 func (w *Wardrobe) Items(ctx context.Context, userID int64) ([]domain.Item, error) {
@@ -66,12 +84,29 @@ func (w *Wardrobe) EditItem(ctx context.Context, userID, itemID int64, params do
 	if err != nil {
 		return domain.Item{}, err
 	}
+	previousPhotoKey := item.PhotoKey
+
 	item, err = item.Edit(params)
 	if err != nil {
 		return domain.Item{}, err
 	}
+
+	photoChanged := item.PhotoKey != previousPhotoKey
+	if photoChanged && item.PhotoKey != "" {
+		if err := w.photos.Confirm(ctx, userID, item.PhotoKey); err != nil {
+			return domain.Item{}, err
+		}
+	}
+
 	if err := w.itemRepository.Update(ctx, item); err != nil {
+		if photoChanged {
+			w.photos.Discard(ctx, item.PhotoKey)
+		}
 		return domain.Item{}, err
+	}
+
+	if photoChanged {
+		w.photos.Discard(ctx, previousPhotoKey)
 	}
 	return item, nil
 }
@@ -90,8 +125,10 @@ func (w *Wardrobe) DeleteItems(ctx context.Context, userID int64, itemIDs []int6
 	if len(itemIDs) == 0 {
 		return nil
 	}
-	if err := w.itemRepository.Delete(ctx, userID, itemIDs); err != nil {
+	photoKeys, err := w.itemRepository.Delete(ctx, userID, itemIDs)
+	if err != nil {
 		return fmt.Errorf("удаление вещей: %w", err)
 	}
+	w.photos.Discard(ctx, photoKeys...)
 	return nil
 }

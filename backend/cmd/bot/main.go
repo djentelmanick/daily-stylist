@@ -13,6 +13,7 @@ import (
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/openmeteo"
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/postgres"
+	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/s3"
 	"github.com/djentelmanick/daily-stylist/backend/internal/config"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
 	"github.com/djentelmanick/daily-stylist/backend/internal/telegram"
@@ -53,8 +54,17 @@ func run() error {
 	items := postgres.NewItemRepository(pool)
 	locations := postgres.NewLocationRepository(pool)
 	weather := openmeteo.NewClient()
+	photoStorage := s3.NewPhotoStorage(s3.Config{
+		Endpoint:  cfg.Photos.Endpoint,
+		PublicURL: cfg.Photos.PublicURL,
+		Region:    cfg.Photos.Region,
+		Bucket:    cfg.Photos.Bucket,
+		AccessKey: cfg.Photos.AccessKey,
+		SecretKey: cfg.Photos.SecretKey,
+	})
 
-	wardrobe := service.NewWardrobe(items)
+	photos := service.NewPhotos(photoStorage, postgres.NewPhotoUploadRepository(pool), time.Now)
+	wardrobe := service.NewWardrobe(items, photos)
 	recommender := service.NewRecommender(items, postgres.NewOutfitRepository(pool), locations, weather, time.Now)
 
 	b, err := telegram.New(telegram.Options{
@@ -63,7 +73,7 @@ func run() error {
 		WebhookPath:    cfg.WebhookPath,
 		WebhookSecret:  cfg.WebhookSecret,
 		ListenAddr:     cfg.ListenAddr,
-		MiniApp:        miniapp.NewHandler(cfg.Token, wardrobe, recommender, service.NewLocations(locations, weather)),
+		MiniApp:        miniapp.NewHandler(cfg.Token, wardrobe, recommender, service.NewLocations(locations, weather), photos),
 	}, handlers.Default)
 	if err != nil {
 		return err

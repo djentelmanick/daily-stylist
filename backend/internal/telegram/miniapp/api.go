@@ -30,6 +30,11 @@ type recommender interface {
 	WearToday(ctx context.Context, userID int64, itemIDs []int64) error
 }
 
+type photos interface {
+	RequestUpload(ctx context.Context, userID int64, contentType string, size int64) (service.PhotoUpload, error)
+	Link(ctx context.Context, key string) (string, error)
+}
+
 type locations interface {
 	SearchCities(ctx context.Context, query string) ([]domain.Location, error)
 	SetLocation(ctx context.Context, userID int64, location domain.Location) error
@@ -39,10 +44,11 @@ type endpoints struct {
 	wardrobe    wardrobe
 	recommender recommender
 	locations   locations
+	photos      photos
 }
 
-func NewHandler(botToken string, wardrobe wardrobe, recommender recommender, locations locations) http.Handler {
-	api := &endpoints{wardrobe: wardrobe, recommender: recommender, locations: locations}
+func NewHandler(botToken string, wardrobe wardrobe, recommender recommender, locations locations, photos photos) http.Handler {
+	api := &endpoints{wardrobe: wardrobe, recommender: recommender, locations: locations, photos: photos}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/options", api.options)
@@ -52,6 +58,7 @@ func NewHandler(botToken string, wardrobe wardrobe, recommender recommender, loc
 	mux.HandleFunc("PUT /api/items/{id}/status", api.changeItemStatus)
 	// Не DELETE с телом: тело у DELETE не определено стандартом, и прокси вправе его выбросить.
 	mux.HandleFunc("POST /api/items/delete", api.deleteItems)
+	mux.HandleFunc("POST /api/photos", api.requestPhotoUpload)
 	mux.HandleFunc("GET /api/recommendation", api.recommend)
 	mux.HandleFunc("GET /api/outfits/today", api.todayOutfit)
 	mux.HandleFunc("PUT /api/outfits/today", api.wearToday)
@@ -80,6 +87,8 @@ type warmthLevelOption struct {
 type textLimits struct {
 	Name        int `json:"name"`
 	Description int `json:"description"`
+	// Форма отсеет слишком большой файл до загрузки.
+	PhotoBytes int64 `json:"photo_bytes"`
 }
 
 type optionsResponse struct {
@@ -97,7 +106,11 @@ func (api *endpoints) options(writer http.ResponseWriter, request *http.Request)
 		// TODO: По времени сервера: пока нет часового пояса пользователя, ошибиться можно
 		// только на несколько часов в ночь смены сезона.
 		CurrentSeason: string(domain.SeasonAt(time.Now())),
-		Limits:        textLimits{Name: domain.MaxNameLength, Description: domain.MaxDescriptionLength},
+		Limits: textLimits{
+			Name:        domain.MaxNameLength,
+			Description: domain.MaxDescriptionLength,
+			PhotoBytes:  service.MaxPhotoBytes,
+		},
 	}
 	for _, category := range domain.AllCategories() {
 		response.Categories = append(response.Categories, categoryOption{
@@ -130,6 +143,7 @@ type itemRequest struct {
 	Seasons     []string `json:"seasons"`
 	WarmthLevel int      `json:"warmth_level"`
 	Waterproof  bool     `json:"waterproof"`
+	PhotoKey    string   `json:"photo_key"`
 }
 
 type itemResponse struct {
@@ -142,6 +156,8 @@ type itemResponse struct {
 	Seasons     []string `json:"seasons"`
 	WarmthLevel int      `json:"warmth_level"`
 	Waterproof  bool     `json:"waterproof"`
+	PhotoKey    string   `json:"photo_key"`
+	PhotoURL    string   `json:"photo_url"`
 	Status      string   `json:"status"`
 }
 
@@ -158,7 +174,7 @@ func (api *endpoints) listItems(writer http.ResponseWriter, request *http.Reques
 
 	response := itemsResponse{Items: make([]itemResponse, len(items))}
 	for index, item := range items {
-		response.Items[index] = toItemResponse(item)
+		response.Items[index] = api.toItemResponse(request.Context(), item)
 	}
 	writeJSON(writer, http.StatusOK, response)
 }
@@ -178,12 +194,13 @@ func (api *endpoints) createItem(writer http.ResponseWriter, request *http.Reque
 		Seasons:     fromStrings[domain.Season](body.Seasons),
 		WarmthLevel: domain.WarmthLevel(body.WarmthLevel),
 		Waterproof:  body.Waterproof,
+		PhotoKey:    body.PhotoKey,
 	})
 	if err != nil {
 		writeFailure(writer, err)
 		return
 	}
-	writeJSON(writer, http.StatusCreated, toItemResponse(item))
+	writeJSON(writer, http.StatusCreated, api.toItemResponse(request.Context(), item))
 }
 
 func (api *endpoints) editItem(writer http.ResponseWriter, request *http.Request) {
@@ -204,12 +221,13 @@ func (api *endpoints) editItem(writer http.ResponseWriter, request *http.Request
 		Seasons:     fromStrings[domain.Season](body.Seasons),
 		WarmthLevel: domain.WarmthLevel(body.WarmthLevel),
 		Waterproof:  body.Waterproof,
+		PhotoKey:    body.PhotoKey,
 	})
 	if err != nil {
 		writeFailure(writer, err)
 		return
 	}
-	writeJSON(writer, http.StatusOK, toItemResponse(item))
+	writeJSON(writer, http.StatusOK, api.toItemResponse(request.Context(), item))
 }
 
 type statusRequest struct {
@@ -262,8 +280,10 @@ func (body itemRequest) colors() domain.Colors {
 	}
 }
 
-func toItemResponse(item domain.Item) itemResponse {
-	return itemResponse{
+// Ссылка на фотографию подписана и живёт недолго, поэтому выдаётся вместе
+// с вещью, а не отдельным запросом.
+func (api *endpoints) toItemResponse(ctx context.Context, item domain.Item) itemResponse {
+	response := itemResponse{
 		ID:          item.ID,
 		Name:        item.Name,
 		Description: item.Description,
@@ -273,8 +293,46 @@ func toItemResponse(item domain.Item) itemResponse {
 		Seasons:     toStrings(item.Seasons),
 		WarmthLevel: int(item.WarmthLevel),
 		Waterproof:  item.Waterproof,
+		PhotoKey:    item.PhotoKey,
 		Status:      string(item.Status),
 	}
+	if item.PhotoKey == "" {
+		return response
+	}
+
+	url, err := api.photos.Link(ctx, item.PhotoKey)
+	if err != nil {
+		// Без ссылки вещь показывается без фотографии - это лучше, чем пустой экран.
+		log.Printf("miniapp: %v", err)
+		return response
+	}
+	response.PhotoURL = url
+	return response
+}
+
+type photoUploadRequest struct {
+	ContentType string `json:"content_type"`
+	Size        int64  `json:"size"`
+}
+
+type photoUploadResponse struct {
+	Key       string `json:"key"`
+	UploadURL string `json:"upload_url"`
+	ViewURL   string `json:"view_url"`
+}
+
+func (api *endpoints) requestPhotoUpload(writer http.ResponseWriter, request *http.Request) {
+	var body photoUploadRequest
+	if !decodeBody(writer, request, &body) {
+		return
+	}
+
+	upload, err := api.photos.RequestUpload(request.Context(), userIDFrom(request.Context()), body.ContentType, body.Size)
+	if err != nil {
+		writeFailure(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusCreated, photoUploadResponse{Key: upload.Key, UploadURL: upload.URL, ViewURL: upload.ViewURL})
 }
 
 func decodeBody(writer http.ResponseWriter, request *http.Request, body any) bool {
@@ -310,6 +368,15 @@ func writeFailure(writer http.ResponseWriter, err error) {
 		writeError(writer, http.StatusUnprocessableEntity, "invalid_location")
 	case errors.Is(err, service.ErrLocationNotSet):
 		writeError(writer, http.StatusConflict, "location_not_set")
+	case errors.Is(err, service.ErrPhotoTooLarge):
+		log.Printf("miniapp: %v", err)
+		writeError(writer, http.StatusUnprocessableEntity, "photo_too_large")
+	case errors.Is(err, service.ErrPhotoTypeUnsupported):
+		log.Printf("miniapp: %v", err)
+		writeError(writer, http.StatusUnprocessableEntity, "photo_type_unsupported")
+	case errors.Is(err, service.ErrPhotoNotUploaded):
+		log.Printf("miniapp: %v", err)
+		writeError(writer, http.StatusUnprocessableEntity, "photo_not_uploaded")
 	case errors.Is(err, service.ErrWeatherUnavailable):
 		log.Printf("miniapp: %v", err)
 		writeError(writer, http.StatusBadGateway, "weather_unavailable")

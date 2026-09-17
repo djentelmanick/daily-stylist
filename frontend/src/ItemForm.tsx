@@ -1,5 +1,7 @@
-import { useState, type FormEvent } from 'react'
-import type { ItemFields, Option, Options, WarmthLevelOption } from './api'
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react'
+import { uploadPhoto, type Item, type ItemFields, type Option, type Options, type WarmthLevelOption } from './api'
+import { preparePhoto } from './photo'
+import { forget, recall, remember } from './session'
 import { errorText, texts } from './texts'
 import { Chip, Swatch } from './ui'
 
@@ -9,21 +11,51 @@ type Props = {
   options: Options
   title: string
   submitText: string
-  initial?: ItemFields
+  draftKey: string
+  initial?: Item
   notice?: string
   onSubmit: (fields: ItemFields) => Promise<void>
 }
 
-export function ItemForm({ options, title, submitText, initial, notice, onSubmit }: Props) {
-  const [name, setName] = useState(initial?.name ?? '')
-  const [description, setDescription] = useState(initial?.description ?? '')
-  const [category, setCategory] = useState(initial?.category ?? '')
-  const [mainColor, setMainColor] = useState(initial?.main_color ?? '')
-  const [extraColors, setExtraColors] = useState<string[]>(initial?.extra_colors ?? [])
-  const [seasons, setSeasons] = useState<string[]>(initial?.seasons ?? [])
-  const [warmthLevel, setWarmthLevel] = useState(initial?.warmth_level ?? 0)
-  const [waterproof, setWaterproof] = useState(initial?.waterproof ?? false)
+type Draft = ItemFields & {
+  photo_url: string
+}
+
+export function forgetDraft(draftKey: string): void {
+  forget(draftKey)
+}
+
+export function ItemForm({ options, title, submitText, draftKey, initial, notice, onSubmit }: Props) {
+  const [draft] = useState(() => recall<Draft>(draftKey) ?? initial ?? null)
+
+  const [name, setName] = useState(draft?.name ?? '')
+  const [description, setDescription] = useState(draft?.description ?? '')
+  const [category, setCategory] = useState(draft?.category ?? '')
+  const [mainColor, setMainColor] = useState(draft?.main_color ?? '')
+  const [extraColors, setExtraColors] = useState<string[]>(draft?.extra_colors ?? [])
+  const [seasons, setSeasons] = useState<string[]>(draft?.seasons ?? [])
+  const [warmthLevel, setWarmthLevel] = useState(draft?.warmth_level ?? 0)
+  const [waterproof, setWaterproof] = useState(draft?.waterproof ?? false)
+  const [photo, setPhoto] = useState<Photo>({ key: draft?.photo_key ?? '', preview: draft?.photo_url ?? '' })
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [photoError, setPhotoError] = useState('')
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
+
+  useEffect(() => {
+    const draft: Draft = {
+      name,
+      description,
+      category,
+      main_color: mainColor,
+      extra_colors: extraColors,
+      seasons,
+      warmth_level: warmthLevel,
+      waterproof,
+      photo_key: photo.key,
+      photo_url: photo.preview,
+    }
+    remember(draftKey, draft)
+  }, [draftKey, name, description, category, mainColor, extraColors, seasons, warmthLevel, waterproof, photo])
 
   const needsWarmth = options.categories.find((option) => option.value === category)?.has_warmth ?? false
   const allSeasonsSelected = seasons.length === options.seasons.length
@@ -33,7 +65,32 @@ export function ItemForm({ options, title, submitText, initial, notice, onSubmit
     mainColor !== '' &&
     seasons.length > 0 &&
     (!needsWarmth || warmthLevel > 0) &&
+    !photoUploading &&
     status.kind !== 'submitting'
+
+  async function choosePhoto(file: File) {
+    setPhotoError('')
+    setPhotoUploading(true)
+    try {
+      const photoFile = await preparePhoto(file)
+      if (photoFile.size > options.limits.photo_bytes) {
+        setPhotoError(texts.photoTooBig(Math.floor(options.limits.photo_bytes / 1024 / 1024)))
+        return
+      }
+
+      const uploaded = await uploadPhoto(photoFile)
+      setPhoto({ key: uploaded.key, preview: uploaded.url })
+    } catch (uploadError) {
+      setPhotoError(errorText(uploadError))
+    } finally {
+      setPhotoUploading(false)
+    }
+  }
+
+  function removePhoto() {
+    setPhotoError('')
+    setPhoto({ key: '', preview: '' })
+  }
 
   function chooseMainColor(color: string) {
     setMainColor(color)
@@ -53,7 +110,9 @@ export function ItemForm({ options, title, submitText, initial, notice, onSubmit
         seasons: inOptionsOrder(options.seasons, seasons),
         warmth_level: needsWarmth ? warmthLevel : 0,
         waterproof,
+        photo_key: photo.key,
       })
+      forget(draftKey)
       setStatus({ kind: 'idle' })
     } catch (error) {
       setStatus({ kind: 'failed', message: errorText(error) })
@@ -63,6 +122,17 @@ export function ItemForm({ options, title, submitText, initial, notice, onSubmit
   return (
     <form className="screen" onSubmit={submit}>
       <h1>{title}</h1>
+
+      <fieldset className="field field-photo">
+        <legend className="field-title">{texts.photo}</legend>
+        <PhotoField
+          preview={photo.preview}
+          uploading={photoUploading}
+          onChoose={choosePhoto}
+          onRemove={removePhoto}
+        />
+        {photoError !== '' && <p className="notice notice-error">{photoError}</p>}
+      </fieldset>
 
       <label className="field">
         <FieldHeader title={texts.name} length={name.length} limit={options.limits.name} />
@@ -169,6 +239,60 @@ export function ItemForm({ options, title, submitText, initial, notice, onSubmit
     </form>
   )
 }
+
+type Photo = {
+  key: string
+  preview: string
+}
+
+function PhotoField({
+  preview,
+  uploading,
+  onChoose,
+  onRemove,
+}: {
+  preview: string
+  uploading: boolean
+  onChoose: (file: File) => void
+  onRemove: () => void
+}) {
+  function choose(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (file) {
+      onChoose(file)
+    }
+  }
+
+  const input = <input type="file" accept={photoTypes} hidden disabled={uploading} onChange={choose} />
+
+  if (preview === '') {
+    return (
+      <label className="photo-field photo-picker">
+        <span className="photo-circle photo-circle-empty">+</span>
+        <span>{uploading ? texts.photoUploading : texts.addPhoto}</span>
+        {input}
+      </label>
+    )
+  }
+
+  return (
+    <div className="photo-field">
+      <img className="photo-circle" src={preview} alt="" />
+      <div className="photo-actions">
+        <label className="button photo-button">
+          {uploading ? texts.loading : texts.changePhoto}
+          {input}
+        </label>
+        <button type="button" className="button" disabled={uploading} onClick={onRemove}>
+          {texts.removePhoto}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const photoTypes = 'image/jpeg,image/png,image/webp'
 
 function FieldHeader({ title, length, limit }: { title: string; length: number; limit: number }) {
   return (
