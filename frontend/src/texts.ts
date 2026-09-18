@@ -1,7 +1,7 @@
 import { ApiError, type ApiErrorCode } from './api'
 
 export const texts = {
-  loading: 'Загружаю…',
+  loading: 'Загружаю',
   openFromBot: 'Откройте приложение из бота в Telegram.',
   loadFailed: 'Не получилось загрузить гардероб. Закройте приложение и откройте заново.',
 
@@ -16,7 +16,7 @@ export const texts = {
   recommendationHint: 'Из вашего гардероба по погоде',
   todayOutfit: 'Сегодня на вас',
 
-  pickingOutfit: 'Смотрю погоду и подбираю образ…',
+  pickingOutfit: 'Смотрю погоду и подбираю образ',
   cityNeeded: 'Чтобы подобрать образ по погоде, выберите город.',
   chooseCity: 'Выбрать город',
   changeCity: 'Сменить город',
@@ -29,7 +29,7 @@ export const texts = {
   cityTitle: 'Город',
   cityHint: 'Для него будет погода в подборе образа.',
   cityPlaceholder: 'Например, Казань',
-  citySearching: 'Ищу…',
+  citySearching: 'Ищу',
   cityNotFound: 'Ничего не нашлось. Проверьте название.',
 
   emptyWardrobe: 'В гардеробе пока ничего нет.',
@@ -38,7 +38,7 @@ export const texts = {
   selectHint: 'Удерживайте вещь, чтобы выбрать несколько',
   selectedCount: (count: number) => `Выбрано: ${count}`,
   deleteSelected: (count: number) => (count === 0 ? 'Выберите вещи' : `Удалить ${items(count)}`),
-  deleting: 'Удаляю…',
+  deleting: 'Удаляю',
   confirmDeleteOne: (name: string) => `Удалить «${name}»? Вернуть не получится.`,
   confirmDeleteMany: (count: number) => `Удалить ${items(count)}? Вернуть не получится.`,
 
@@ -62,20 +62,27 @@ export const texts = {
   extraColors: 'Дополнительные цвета',
   seasons: 'Сезоны',
   allSeasons: 'Все сезоны',
-  warmthLevel: 'Насколько тёплая',
-  warmthNotChosen: 'Не выбрано — сдвиньте ползунок',
-  warmthLighter: 'Легче',
-  warmthWarmer: 'Теплее',
+  warmthLevel: 'Для какой погоды',
+  warmthWarm: '☀️',
+  warmthCold: '❄️',
   waterproof: 'Не промокает',
   photo: 'Фотография',
-  addPhoto: 'Добавить фотографию',
-  changePhoto: 'Заменить',
+  takePhoto: 'Сфоткать',
+  pickPhoto: 'Загрузить',
   removePhoto: 'Убрать',
-  photoUploading: 'Загружаю фотографию…',
+  shoot: 'Снять',
+  flipCamera: 'Переключить камеру',
+  lens: (number: number) => `Объектив ${number}`,
+  cameraDenied: 'Нет доступа к камере. Разрешите его Telegram в настройках телефона или выберите фото из галереи.',
+  cameraMissing: 'Камера не найдена. Выберите фото из галереи.',
+  cameraFailed: 'Не получилось включить камеру. Выберите фото из галереи.',
+  photoUploading: 'Загружаю фотографию',
+  photoRecognizing: 'Смотрю, что на фотографии',
+  photoRecognized: 'Заполнил поля по фотографии, проверьте и поправьте',
   photoTooBig: (megabytes: number) => `Фотография больше ${megabytes} МБ. Выберите другую.`,
   add: 'Добавить',
   save: 'Сохранить',
-  submitting: 'Сохраняю…',
+  submitting: 'Сохраняю',
   added: (name: string) => `Вещь «${name}» добавлена в гардероб`,
 }
 
@@ -112,6 +119,7 @@ export const errorTexts: Record<ApiErrorCode, string> = {
   photo_type_unsupported: 'Такой формат фотографии не поддерживается. Подойдут JPEG, PNG и WebP.',
   photo_not_uploaded: 'Фотография не загрузилась. Попробуйте выбрать её заново.',
   photo_upload_failed: 'Не получилось загрузить фотографию. Попробуйте ещё раз.',
+  recognition_unavailable: 'Не получилось распознать фотографию. Заполните поля сами.',
   internal: 'Что-то пошло не так. Попробуйте позже.',
   network: 'Нет связи с сервером. Проверьте интернет.',
 }

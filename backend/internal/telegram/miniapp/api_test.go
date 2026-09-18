@@ -230,6 +230,13 @@ func TestOptions_ListsDomainValues(t *testing.T) {
 	if options.Limits.Name != domain.MaxNameLength || options.Limits.Description != domain.MaxDescriptionLength {
 		t.Errorf("лимиты = %+v, ожидались %d и %d", options.Limits, domain.MaxNameLength, domain.MaxDescriptionLength)
 	}
+	// Форма отсеивает негодный файл до загрузки, поэтому список форматов приходит ей отсюда.
+	if !slices.Equal(options.Limits.PhotoTypes, service.PhotoTypes()) {
+		t.Errorf("форматы фотографий = %v, ожидались %v", options.Limits.PhotoTypes, service.PhotoTypes())
+	}
+	if options.Limits.PhotoBytes != service.MaxPhotoBytes {
+		t.Errorf("лимит размера = %d, ожидался %d", options.Limits.PhotoBytes, service.MaxPhotoBytes)
+	}
 	for _, category := range options.Categories {
 		if category.Value == string(domain.CategoryUmbrella) && category.HasWarmth {
 			t.Errorf("у зонта не должно быть уровня теплоты")
@@ -339,6 +346,20 @@ func (photos *stubPhotos) Confirm(_ context.Context, _ int64, key string) error 
 
 func (photos *stubPhotos) Discard(_ context.Context, keys ...string) {
 	photos.discarded = append(photos.discarded, keys...)
+}
+
+type stubRecognition struct {
+	suggestion service.ItemSuggestion
+	err        error
+	key        string
+}
+
+func (recognition *stubRecognition) FromPhoto(_ context.Context, _ int64, key string) (service.ItemSuggestion, error) {
+	recognition.key = key
+	if recognition.err != nil {
+		return service.ItemSuggestion{}, recognition.err
+	}
+	return recognition.suggestion, nil
 }
 
 type failingWardrobe struct {

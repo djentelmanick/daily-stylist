@@ -34,6 +34,14 @@ export function getInitData(): string {
   return webApp?.initData ?? ''
 }
 
+// Нажатие получает только верхний обработчик: экран под открытой камерой не должен
+// закрыться вместе с ней.
+const backHandlers: { current: () => void }[] = []
+
+function handleBack() {
+  backHandlers[backHandlers.length - 1]?.current()
+}
+
 export function useBackButton(onBack: () => void): void {
   const latest = useRef(onBack)
   useEffect(() => {
@@ -45,12 +53,17 @@ export function useBackButton(onBack: () => void): void {
       return
     }
     const button = webApp.BackButton
-    const handleClick = () => latest.current()
-    button.onClick(handleClick)
-    button.show()
+    if (backHandlers.length === 0) {
+      button.onClick(handleBack)
+      button.show()
+    }
+    backHandlers.push(latest)
     return () => {
-      button.offClick(handleClick)
-      button.hide()
+      backHandlers.splice(backHandlers.indexOf(latest), 1)
+      if (backHandlers.length === 0) {
+        button.offClick(handleBack)
+        button.hide()
+      }
     }
   }, [])
 }

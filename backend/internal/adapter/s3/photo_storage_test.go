@@ -62,6 +62,14 @@ func TestPhotoStorage_UploadDescribeDownloadDelete(t *testing.T) {
 		t.Errorf("в хранилище %+v, ожидались %d байт типа image/jpeg", info, len(photo))
 	}
 
+	content, err := storage.Read(t.Context(), key)
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if !bytes.Equal(content.Bytes, photo) || content.ContentType != "image/jpeg" {
+		t.Errorf("прочитано %q типа %q, ожидались %q и image/jpeg", content.Bytes, content.ContentType, photo)
+	}
+
 	download, err := storage.DownloadLink(t.Context(), key, linkTTL)
 	if err != nil {
 		t.Fatalf("DownloadLink: %v", err)
@@ -75,6 +83,9 @@ func TestPhotoStorage_UploadDescribeDownloadDelete(t *testing.T) {
 	}
 	if _, err := storage.Describe(t.Context(), key); !errors.Is(err, service.ErrPhotoNotUploaded) {
 		t.Errorf("после удаления ошибка = %v, ожидалась ErrPhotoNotUploaded", err)
+	}
+	if _, err := storage.Read(t.Context(), key); !errors.Is(err, service.ErrPhotoNotUploaded) {
+		t.Errorf("после удаления чтение вернуло %v, ожидалась ErrPhotoNotUploaded", err)
 	}
 }
 

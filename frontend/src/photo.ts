@@ -1,6 +1,9 @@
 const maxSide = 1600
 const quality = 0.85
 const outputType = 'image/jpeg'
+// Эти форматы читают и хранилище, и модель, которая смотрит на фотографию. Остальные -
+// например webp - меняем на jpeg всегда, даже когда файл от этого потяжелеет.
+const keptTypes = ['image/jpeg', 'image/png']
 
 export async function preparePhoto(file: File): Promise<File> {
   try {
@@ -18,8 +21,11 @@ export async function preparePhoto(file: File): Promise<File> {
     image.close()
 
     const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, outputType, quality))
+    if (blob === null) {
+      return file
+    }
     // Маленький снимок после пережатия может оказаться тяжелее: тогда он и не нужен.
-    if (blob === null || blob.size >= file.size) {
+    if (blob.size >= file.size && keptTypes.includes(file.type)) {
       return file
     }
     return new File([blob], 'photo.jpg', { type: outputType })

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { saveCity, searchCities, type City } from './api'
 import { useBackButton } from './telegram'
 import { errorText, texts } from './texts'
+import { Thinking } from './ui'
 
 const minQueryLength = 2
 const searchDelayMs = 300
@@ -72,7 +73,11 @@ export function CityScreen({ onBack, onSaved }: { onBack: () => void; onSaved: (
         onChange={(event) => setQuery(event.target.value)}
       />
 
-      {searching && <p className="hint">{texts.citySearching}</p>}
+      {searching && (
+        <p className="hint">
+          <Thinking>{texts.citySearching}</Thinking>
+        </p>
+      )}
       {cities?.length === 0 && <p className="hint">{texts.cityNotFound}</p>}
       {cities !== null && cities.length > 0 && (
         <ul className="item-list">

@@ -167,6 +167,7 @@ type fakePhotoStorage struct {
 	files      map[string]PhotoInfo
 	uploadSize int64
 	uploadType string
+	readErr    error
 }
 
 func (storage *fakePhotoStorage) put(key string, info PhotoInfo) {
@@ -191,6 +192,17 @@ func (storage *fakePhotoStorage) Describe(_ context.Context, key string) (PhotoI
 		return PhotoInfo{}, ErrPhotoNotUploaded
 	}
 	return info, nil
+}
+
+func (storage *fakePhotoStorage) Read(_ context.Context, key string) (PhotoContent, error) {
+	if storage.readErr != nil {
+		return PhotoContent{}, storage.readErr
+	}
+	info, ok := storage.files[key]
+	if !ok {
+		return PhotoContent{}, ErrPhotoNotUploaded
+	}
+	return PhotoContent{Bytes: []byte("байты " + key), ContentType: info.ContentType}, nil
 }
 
 func (storage *fakePhotoStorage) Delete(_ context.Context, keys []string) error {

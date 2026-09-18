@@ -6,7 +6,9 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"slices"
 	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -15,7 +17,24 @@ const (
 	defaultBotListenAddr = ":2000"
 	defaultWebhookPath   = "/telegram/webhook"
 	defaultS3Region      = "us-east-1"
+	defaultVisionAddr    = "localhost:59090"
+
+	defaultGigaChatAuthURL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
+	defaultGigaChatBaseURL = "https://api.giga.chat/v1"
+	defaultGigaChatScope   = "GIGACHAT_API_PERS"
+	defaultGigaChatModel   = "GigaChat-3-Ultra"
+
+	recognitionTimeout = 45 * time.Second
 )
+
+const (
+	RecognizerGigaChat = "gigachat"
+	RecognizerVision   = "vision"
+)
+
+var allRecognizers = []string{RecognizerGigaChat, RecognizerVision}
+
+var ErrInvalidRecognizer = errors.New("неверно настроен распознаватель")
 
 type Bot struct {
 	Token          string
@@ -25,6 +44,27 @@ type Bot struct {
 	ListenAddr     string
 	DatabaseURL    string
 	Photos         PhotoStorage
+	Recognition    Recognition
+}
+
+type Recognition struct {
+	Primary  string
+	Fallback string
+	Timeout  time.Duration
+	GigaChat GigaChat
+	Vision   Vision
+}
+
+type GigaChat struct {
+	Credentials string
+	AuthURL     string
+	BaseURL     string
+	Scope       string
+	Model       string
+}
+
+type Vision struct {
+	Address string
 }
 
 type PhotoStorage struct {
@@ -54,12 +94,52 @@ func LoadBot() (Bot, error) {
 			AccessKey: env.required("S3_ACCESS_KEY"),
 			SecretKey: env.required("S3_SECRET_KEY"),
 		},
+		Recognition: Recognition{
+			Primary:  env.optional("RECOGNIZER", RecognizerGigaChat),
+			Fallback: env.optional("RECOGNIZER_FALLBACK", ""),
+			Timeout:  recognitionTimeout,
+			GigaChat: GigaChat{
+				Credentials: env.optional("GIGACHAT_AUTH_KEY", ""),
+				AuthURL:     env.optional("GIGACHAT_AUTH_URL", defaultGigaChatAuthURL),
+				BaseURL:     env.optional("GIGACHAT_BASE_URL", defaultGigaChatBaseURL),
+				Scope:       env.optional("GIGACHAT_SCOPE", defaultGigaChatScope),
+				Model:       env.optional("GIGACHAT_MODEL", defaultGigaChatModel),
+			},
+			Vision: Vision{Address: env.optional("VISION_ADDR", defaultVisionAddr)},
+		},
 	}
 	if err := env.err(); err != nil {
 		return Bot{}, err
 	}
+	if err := cfg.Recognition.validate(); err != nil {
+		return Bot{}, err
+	}
 
 	return cfg, nil
+}
+
+func (recognition Recognition) validate() error {
+	if !slices.Contains(allRecognizers, recognition.Primary) {
+		return fmt.Errorf("%w: RECOGNIZER=%q, ожидалось одно из %s",
+			ErrInvalidRecognizer, recognition.Primary, strings.Join(allRecognizers, ", "))
+	}
+	if recognition.Fallback != "" {
+		if !slices.Contains(allRecognizers, recognition.Fallback) {
+			return fmt.Errorf("%w: RECOGNIZER_FALLBACK=%q, ожидалось одно из %s или пусто",
+				ErrInvalidRecognizer, recognition.Fallback, strings.Join(allRecognizers, ", "))
+		}
+		if recognition.Fallback == recognition.Primary {
+			return fmt.Errorf("%w: запасной совпадает с основным (%s)", ErrInvalidRecognizer, recognition.Primary)
+		}
+	}
+	if recognition.uses(RecognizerGigaChat) && recognition.GigaChat.Credentials == "" {
+		return fmt.Errorf("%w: для %s нужен GIGACHAT_AUTH_KEY", ErrInvalidRecognizer, RecognizerGigaChat)
+	}
+	return nil
+}
+
+func (recognition Recognition) uses(name string) bool {
+	return recognition.Primary == name || recognition.Fallback == name
 }
 
 type Migrate struct {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -95,6 +96,31 @@ func (storage *PhotoStorage) Describe(ctx context.Context, key string) (service.
 		Size:        aws.ToInt64(head.ContentLength),
 		ContentType: aws.ToString(head.ContentType),
 	}, nil
+}
+
+func (storage *PhotoStorage) Read(ctx context.Context, key string) (service.PhotoContent, error) {
+	object, err := storage.client.GetObject(ctx, &awss3.GetObjectInput{
+		Bucket: aws.String(storage.bucket),
+		Key:    aws.String(key),
+	})
+	var noSuchKey *types.NoSuchKey
+	if errors.As(err, &noSuchKey) {
+		return service.PhotoContent{}, service.ErrPhotoNotUploaded
+	}
+	if err != nil {
+		return service.PhotoContent{}, fmt.Errorf("чтение фотографии %q: %w", key, err)
+	}
+	defer func() { _ = object.Body.Close() }()
+
+	// С запасом в байт: если файл оказался больше разрешённого, это видно по длине.
+	content, err := io.ReadAll(io.LimitReader(object.Body, service.MaxPhotoBytes+1))
+	if err != nil {
+		return service.PhotoContent{}, fmt.Errorf("чтение фотографии %q: %w", key, err)
+	}
+	if len(content) > service.MaxPhotoBytes {
+		return service.PhotoContent{}, fmt.Errorf("чтение фотографии %q: %w", key, service.ErrPhotoTooLarge)
+	}
+	return service.PhotoContent{Bytes: content, ContentType: aws.ToString(object.ContentType)}, nil
 }
 
 // По одному, а не пачкой: пачками удаляют десятки тысяч, а здесь - фотографии

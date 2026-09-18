@@ -40,3 +40,24 @@ export function ItemMark({ item }: { item: Item }) {
     </span>
   )
 }
+
+// Многоточие в тексте не пишем - точки уже здесь.
+export function Thinking({ children }: { children: string }) {
+  return (
+    <span className="thinking">
+      <span className="thinking-text">{children}</span>
+      <Dots />
+    </span>
+  )
+}
+
+// На кнопке блик по буквам не читается, поэтому там только точки.
+export function Dots() {
+  return (
+    <span className="thinking-dots" aria-hidden="true">
+      <i />
+      <i />
+      <i />
+    </span>
+  )
+}

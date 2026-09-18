@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ApiError, fetchRecommendation, labelOf, wearToday, type Options, type Recommendation } from './api'
 import { useBackButton } from './telegram'
 import { errorText, texts } from './texts'
-import { ItemMark } from './ui'
+import { Dots, ItemMark, Thinking } from './ui'
 
 export type RecommendationMemory = {
   recommendation: Recommendation | null
@@ -66,7 +66,11 @@ export function RecommendationScreen({
 
   switch (state.kind) {
     case 'loading':
-      return <p className="message">{texts.pickingOutfit}</p>
+      return (
+        <p className="message">
+          <Thinking>{texts.pickingOutfit}</Thinking>
+        </p>
+      )
     case 'failed':
       return <p className="message">{state.message}</p>
     case 'needsCity':
@@ -196,7 +200,16 @@ function RecommendationView({
               </button>
             )}
             <button type="button" className="button button-accent" disabled={saving || worn} onClick={wear}>
-              {worn ? texts.worn : saving ? texts.submitting : texts.wear}
+              {worn ? (
+                texts.worn
+              ) : saving ? (
+                <>
+                  {texts.submitting}
+                  <Dots />
+                </>
+              ) : (
+                texts.wear
+              )}
             </button>
           </div>
           {worn && <p className="hint">{texts.wornHint}</p>}

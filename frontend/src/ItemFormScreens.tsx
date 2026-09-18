@@ -9,10 +9,12 @@ const newItemDraft = 'draft:new-item'
 export function AddItemScreen({
   options,
   onBack,
+  onOpenPhoto,
   onAdded,
 }: {
   options: Options
   onBack: () => void
+  onOpenPhoto: (url: string, caption: string) => void
   onAdded: (item: Item) => void
 }) {
   useBackButton(() => {
@@ -38,6 +40,7 @@ export function AddItemScreen({
       submitText={texts.add}
       draftKey={newItemDraft}
       notice={addedName === '' ? undefined : texts.added(addedName)}
+      onOpenPhoto={onOpenPhoto}
       onSubmit={add}
     />
   )
@@ -47,11 +50,13 @@ export function EditItemScreen({
   options,
   item,
   onBack,
+  onOpenPhoto,
   onSaved,
 }: {
   options: Options
   item: Item
   onBack: () => void
+  onOpenPhoto: (url: string, caption: string) => void
   onSaved: (item: Item) => void
 }) {
   const draftKey = `draft:item:${item.id}`
@@ -71,6 +76,7 @@ export function EditItemScreen({
       submitText={texts.save}
       draftKey={draftKey}
       initial={item}
+      onOpenPhoto={onOpenPhoto}
       onSubmit={save}
     />
   )

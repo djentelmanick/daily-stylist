@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { availableStatus, deleteItems, labelOf, type Item, type Options } from './api'
 import { confirm, useBackButton, vibrate } from './telegram'
 import { errorText, texts } from './texts'
-import { ItemMark } from './ui'
+import { Dots, ItemMark } from './ui'
 import { useLongPress } from './useLongPress'
 
 export function WardrobeScreen({
@@ -116,7 +116,14 @@ export function WardrobeScreen({
           disabled={selected.length === 0 || deleting}
           onClick={deleteSelected}
         >
-          {deleting ? texts.deleting : texts.deleteSelected(selected.length)}
+          {deleting ? (
+            <>
+              {texts.deleting}
+              <Dots />
+            </>
+          ) : (
+            texts.deleteSelected(selected.length)
+          )}
         </button>
       )}
     </div>

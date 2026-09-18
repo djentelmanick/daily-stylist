@@ -62,6 +62,14 @@ type recommender struct {
 	wornDaysAgo map[int64]int
 }
 
+type rainPlan int
+
+const (
+	rainNothing rainPlan = iota
+	rainUmbrella
+	rainCoat
+)
+
 // look - основа образа: одежда, от которой зависят теплота и цвета.
 // Аксессуары подбираются к ней потом.
 type look struct {
@@ -69,6 +77,7 @@ type look struct {
 	base      []domain.Item
 	outerwear *domain.Item
 	shoes     *domain.Item
+	rain      rainPlan
 	score     int
 }
 
@@ -83,29 +92,35 @@ func (look look) items() []domain.Item {
 }
 
 // looks перебирает сочетания и оставляет лучшее для каждой основы: варианты
-// должны отличаться одеждой и обувью.
+// должны отличаться одеждой и обувью. В дождь основа удваивается - с зонтом и с
+// дождевиком, - поэтому способ защиты входит в ключ.
 func (recommender recommender) looks() []look {
-	type baseKey [2]int64
+	type baseKey struct {
+		top, bottom int64
+		rain        rainPlan
+	}
 	var order []baseKey
 	best := map[baseKey]look{}
 
 	shoes := options(closest(recommender.wardrobe[domain.CategoryShoes], recommender.conditions.level))
-	for _, outerwear := range recommender.outerwearOptions() {
-		for _, base := range recommender.bases(outerwear != nil) {
-			for _, pair := range shoes {
-				candidate := look{base: base, outerwear: outerwear, shoes: pair}
-				candidate.score = recommender.score(candidate)
+	for _, plan := range recommender.rainPlans() {
+		for _, outerwear := range recommender.outerwearOptions(plan) {
+			for _, base := range recommender.bases(outerwear != nil) {
+				for _, pair := range shoes {
+					candidate := look{base: base, outerwear: outerwear, shoes: pair, rain: plan}
+					candidate.score = recommender.score(candidate)
 
-				key := baseKey{base[0].ID}
-				if len(base) > 1 {
-					key[1] = base[1].ID
-				}
-				current, seen := best[key]
-				if !seen {
-					order = append(order, key)
-				}
-				if !seen || candidate.score < current.score {
-					best[key] = candidate
+					key := baseKey{top: base[0].ID, rain: plan}
+					if len(base) > 1 {
+						key.bottom = base[1].ID
+					}
+					current, seen := best[key]
+					if !seen {
+						order = append(order, key)
+					}
+					if !seen || candidate.score < current.score {
+						best[key] = candidate
+					}
 				}
 			}
 		}
@@ -136,20 +151,43 @@ func (recommender recommender) bases(withOuterwear bool) [][]domain.Item {
 	return bases
 }
 
-func (recommender recommender) outerwearOptions() []*domain.Item {
+func (recommender recommender) outerwearOptions(plan rainPlan) []*domain.Item {
 	conditions := recommender.conditions
-	coats := recommender.wardrobe[domain.CategoryOuterwear]
 
-	if conditions.needOuterwear {
-		return options(closest(coats, conditions.level))
-	}
-	if conditions.precipitation && !recommender.umbrellaHelps() {
-		raincoats := near(slices.DeleteFunc(slices.Clone(coats), func(coat domain.Item) bool { return !coat.Waterproof }), conditions.level)
-		if len(raincoats) > 0 {
-			return options(raincoats)
+	if plan == rainCoat {
+		raincoats := recommender.raincoats()
+		if fitting := near(raincoats, conditions.level); len(fitting) > 0 {
+			return options(fitting)
 		}
+		return options(closest(raincoats, conditions.level))
+	}
+	if conditions.needOuterwear {
+		return options(closest(recommender.wardrobe[domain.CategoryOuterwear], conditions.level))
 	}
 	return []*domain.Item{nil}
+}
+
+func (recommender recommender) rainPlans() []rainPlan {
+	if !recommender.conditions.precipitation {
+		return []rainPlan{rainNothing}
+	}
+
+	var plans []rainPlan
+	if recommender.umbrellaHelps() {
+		plans = append(plans, rainUmbrella)
+	}
+	if len(recommender.raincoats()) > 0 {
+		plans = append(plans, rainCoat)
+	}
+	if len(plans) == 0 {
+		return []rainPlan{rainNothing}
+	}
+	return plans
+}
+
+func (recommender recommender) raincoats() []domain.Item {
+	coats := slices.Clone(recommender.wardrobe[domain.CategoryOuterwear])
+	return slices.DeleteFunc(coats, func(coat domain.Item) bool { return !coat.Waterproof })
 }
 
 func (recommender recommender) umbrellaHelps() bool {
@@ -163,7 +201,9 @@ func (recommender recommender) score(look look) int {
 	for _, item := range items {
 		score += warmthStepPenalty * distance(item, recommender.conditions.idealLevel(item, look.outerwear != nil))
 		score += recommender.historyPenalty(item)
-		protects := item.Category == domain.CategoryOuterwear || item.Category == domain.CategoryShoes
+		// Под зонтом непромокаемая куртка не нужна, а вот обувь он не прикрывает.
+		protects := item.Category == domain.CategoryShoes ||
+			(item.Category == domain.CategoryOuterwear && look.rain != rainUmbrella)
 		if recommender.conditions.precipitation && protects && !item.Waterproof {
 			score += notWaterproofPenalty
 		}
@@ -239,12 +279,10 @@ func (recommender recommender) outfit(look look) domain.Outfit {
 	}
 
 	umbrella := false
-	if conditions.rain() && len(wardrobe[domain.CategoryUmbrella]) > 0 {
-		if conditions.windy {
-			notes = append(notes, domain.Note{Kind: domain.NoteTooWindyForUmbrella})
-		} else {
-			umbrella = add(wardrobe[domain.CategoryUmbrella], level)
-		}
+	if look.rain == rainUmbrella {
+		umbrella = add(wardrobe[domain.CategoryUmbrella], level)
+	} else if conditions.rain() && conditions.windy && len(wardrobe[domain.CategoryUmbrella]) > 0 {
+		notes = append(notes, domain.Note{Kind: domain.NoteTooWindyForUmbrella})
 	}
 	raincoat := withOuterwear && look.outerwear.Waterproof
 	if conditions.rain() && !umbrella && !raincoat {

@@ -139,13 +139,13 @@ export function ItemScreen({
   )
 }
 
-export function PhotoScreen({ item, onBack }: { item: Item; onBack: () => void }) {
+export function PhotoScreen({ url, caption, onBack }: { url: string; caption: string; onBack: () => void }) {
   useBackButton(onBack)
 
   return (
     <div className="screen photo-screen">
-      <img src={item.photo_url} alt={item.name} />
-      <p className="hint">{item.name}</p>
+      <img src={url} alt={caption} />
+      {caption !== '' && <p className="hint">{caption}</p>}
     </div>
   )
 }

@@ -35,11 +35,31 @@ type PhotoInfo struct {
 	ContentType string
 }
 
+type PhotoContent struct {
+	Bytes       []byte
+	ContentType string
+}
+
 type PhotoStorage interface {
 	UploadLink(ctx context.Context, key, contentType string, size int64, ttl time.Duration) (string, error)
 	DownloadLink(ctx context.Context, key string, ttl time.Duration) (string, error)
 	Describe(ctx context.Context, key string) (PhotoInfo, error)
+	Read(ctx context.Context, key string) (PhotoContent, error)
 	Delete(ctx context.Context, keys []string) error
+}
+
+// Пустое поле - распознать не удалось.
+type ItemSuggestion struct {
+	Name        string
+	Category    domain.Category
+	Colors      domain.Colors
+	Seasons     []domain.Season
+	WarmthLevel domain.WarmthLevel
+	Waterproof  bool
+}
+
+type PhotoRecognizer interface {
+	Recognize(ctx context.Context, photo PhotoContent) (ItemSuggestion, error)
 }
 
 type LocationRepository interface {

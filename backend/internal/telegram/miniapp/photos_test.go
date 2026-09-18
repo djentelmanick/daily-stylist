@@ -40,7 +40,7 @@ func TestRequestPhotoUpload_TellsWhyFileWasRejected(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			photos := &stubPhotos{uploadErr: test.err}
-			handler := NewHandler(testBotToken, failingWardrobe{}, &stubRecommender{}, nil, photos)
+			handler := NewHandler(testBotToken, failingWardrobe{}, &stubRecommender{}, nil, photos, &stubRecognition{})
 
 			response := serve(handler, newRequest(http.MethodPost, "/api/photos",
 				`{"content_type":"image/jpeg","size":2048}`, signedInitData(testBotToken, 42, time.Now())))
@@ -104,5 +104,5 @@ func TestListItems_ItemWithoutPhotoHasNoLink(t *testing.T) {
 }
 
 func newHandlerWithPhotos(wardrobe wardrobe, photos photos) http.Handler {
-	return NewHandler(testBotToken, wardrobe, &stubRecommender{err: errors.New("подбор не должен вызываться")}, nil, photos)
+	return NewHandler(testBotToken, wardrobe, &stubRecommender{err: errors.New("подбор не должен вызываться")}, nil, photos, &stubRecognition{})
 }

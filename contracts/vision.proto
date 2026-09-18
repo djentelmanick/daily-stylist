@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package stylist.vision.v1;
+
+option go_package = "github.com/djentelmanick/daily-stylist/backend/internal/adapter/recognizers/vision/visionpb";
+
+service Recognizer {
+  rpc RecognizeItem(RecognizeItemRequest) returns (RecognizeItemResponse);
+}
+
+message RecognizeItemRequest {
+  bytes photo = 1;
+  string content_type = 2;
+}
+
+// Значения - строки словаря домена ("top", "navy", "winter"); пустое значение - "не знаю".
+message RecognizeItemResponse {
+  string name = 1;
+  string category = 2;
+  string main_color = 3;
+  repeated string extra_colors = 4;
+  repeated string seasons = 5;
+  int32 warmth_level = 6;
+  bool waterproof = 7;
+}

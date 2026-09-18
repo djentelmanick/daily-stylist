@@ -33,6 +33,20 @@ services:
       timeout: 3s
       retries: 15
 
+  # Своя модель нужна, только когда RECOGNIZER или RECOGNIZER_FALLBACK - vision.
+  # Тогда: docker compose --profile vision up -d --wait vision
+  vision:
+    build: ../vision
+    profiles: ["vision"]
+    ports:
+      - "${VISION_PORT:-59090}:9090"
+    healthcheck:
+      test: ["CMD", "python", "/app/healthcheck.py"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 15s
+
 volumes:
   postgres-data:
   seaweedfs-data:

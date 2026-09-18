@@ -25,6 +25,7 @@ export type Options = {
     name: number
     description: number
     photo_bytes: number
+    photo_types: string[]
   }
 }
 
@@ -44,6 +45,17 @@ export type Item = ItemFields & {
   id: number
   status: string
   photo_url: string
+}
+
+// Пустое поле - не распозналось.
+export type Suggestion = {
+  name: string
+  category: string
+  main_color: string
+  extra_colors: string[]
+  seasons: string[]
+  warmth_level: number
+  waterproof: boolean
 }
 
 export const availableStatus = 'available'
@@ -84,6 +96,7 @@ export type ApiErrorCode =
   | 'photo_type_unsupported'
   | 'photo_not_uploaded'
   | 'photo_upload_failed'
+  | 'recognition_unavailable'
   | 'internal'
   | 'network'
 
@@ -99,6 +112,7 @@ const serverErrorCodes: ApiErrorCode[] = [
   'photo_too_large',
   'photo_type_unsupported',
   'photo_not_uploaded',
+  'recognition_unavailable',
   'internal',
 ]
 
@@ -161,6 +175,10 @@ export async function uploadPhoto(file: File): Promise<UploadedPhoto> {
     throw new ApiError('photo_upload_failed')
   }
   return { key: upload.key, url: upload.view_url }
+}
+
+export function recognizePhoto(photoKey: string): Promise<Suggestion> {
+  return request<Suggestion>('POST', '/api/photos/recognize', { photo_key: photoKey })
 }
 
 export function fetchRecommendation(): Promise<Recommendation> {

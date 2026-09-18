@@ -4,17 +4,21 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/go-telegram/bot"
+	"github.com/sethvargo/go-retry"
 )
 
 const (
 	shutdownTimeout   = 5 * time.Second
 	readHeaderTimeout = 10 * time.Second
+	startupAttempts   = 3
+	startupPause      = time.Second
 )
 
 type Options struct {
@@ -33,17 +37,22 @@ type Bot struct {
 	opts       Options
 }
 
-func New(opts Options, handler bot.HandlerFunc) (*Bot, error) {
+func New(ctx context.Context, opts Options, handler bot.HandlerFunc) (*Bot, error) {
 	webhookURL, pattern, err := webhookRoute(opts.WebhookBaseURL, opts.WebhookPath)
 	if err != nil {
 		return nil, err
 	}
 
-	api, err := bot.New(
-		opts.Token,
-		bot.WithDefaultHandler(handler),
-		bot.WithWebhookSecretToken(opts.WebhookSecret),
-	)
+	var api *bot.Bot
+	err = retryStartup(ctx, startupPause, func() error {
+		var err error
+		api, err = bot.New(
+			opts.Token,
+			bot.WithDefaultHandler(handler),
+			bot.WithWebhookSecretToken(opts.WebhookSecret),
+		)
+		return err
+	})
 	if err != nil {
 		return nil, fmt.Errorf("создание клиента telegram: %w", err)
 	}
@@ -79,10 +88,14 @@ func webhookRoute(baseURL, path string) (webhookURL, pattern string, err error) 
 }
 
 func (b *Bot) Run(ctx context.Context) error {
-	if _, err := b.api.SetWebhook(ctx, &bot.SetWebhookParams{
-		URL:         b.webhookURL,
-		SecretToken: b.opts.WebhookSecret,
-	}); err != nil {
+	err := retryStartup(ctx, startupPause, func() error {
+		_, err := b.api.SetWebhook(ctx, &bot.SetWebhookParams{
+			URL:         b.webhookURL,
+			SecretToken: b.opts.WebhookSecret,
+		})
+		return err
+	})
+	if err != nil {
 		return fmt.Errorf("регистрация вебхука: %w", err)
 	}
 
@@ -103,6 +116,31 @@ func (b *Bot) Run(ctx context.Context) error {
 	case <-ctx.Done():
 		return b.shutdown()
 	}
+}
+
+func retryStartup(ctx context.Context, pause time.Duration, action func() error) error {
+	backoff := retry.WithMaxRetries(startupAttempts-1, retry.NewExponential(pause))
+	attempt := 0
+	return retry.Do(ctx, backoff, func(context.Context) error {
+		attempt++
+		err := action()
+		if err == nil || !transient(err) {
+			return err
+		}
+		log.Printf("telegram: попытка %d из %d не удалась: %v", attempt, startupAttempts, err)
+		return retry.RetryableError(err)
+	})
+}
+
+func transient(err error) bool {
+	for _, final := range []error{
+		bot.ErrorUnauthorized, bot.ErrorForbidden, bot.ErrorBadRequest, bot.ErrorNotFound, bot.ErrorConflict,
+	} {
+		if errors.Is(err, final) {
+			return false
+		}
+	}
+	return true
 }
 
 func (b *Bot) shutdown() error {

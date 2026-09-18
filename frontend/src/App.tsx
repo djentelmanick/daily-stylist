@@ -9,6 +9,7 @@ import { recall, remember } from './session'
 import { getInitData, useBackButton } from './telegram'
 import { errorTexts, texts } from './texts'
 import { WardrobeScreen } from './WardrobeScreen'
+import { Thinking } from './ui'
 
 type State =
   | { kind: 'loading' }
@@ -45,7 +46,11 @@ export function App() {
 
   switch (state.kind) {
     case 'loading':
-      return <p className="message">{texts.loading}</p>
+      return (
+        <p className="message">
+          <Thinking>{texts.loading}</Thinking>
+        </p>
+      )
     case 'outsideTelegram':
       return <p className="message">{texts.openFromBot}</p>
     case 'failed':
@@ -61,11 +66,12 @@ type Screen =
   | { kind: 'item'; itemId: number }
   | { kind: 'edit'; itemId: number }
   | { kind: 'photo'; itemId: number }
+  | { kind: 'draftPhoto'; url: string; caption: string }
   | { kind: 'add' }
   | { kind: 'recommendation' }
   | { kind: 'city' }
 
-const screenKinds = ['home', 'wardrobe', 'item', 'edit', 'photo', 'add', 'recommendation', 'city']
+const screenKinds = ['home', 'wardrobe', 'item', 'edit', 'photo', 'draftPhoto', 'add', 'recommendation', 'city']
 const openScreens = 'screens'
 
 // Телефон и Telegram перезагружают страницу когда угодно - например, пока открыт
@@ -126,6 +132,10 @@ function Screens({
     setItems((current) => current.filter((item) => !itemIds.includes(item.id)))
   }
 
+  function openDraftPhoto(url: string, caption: string) {
+    open({ kind: 'draftPhoto', url, caption })
+  }
+
   function forgetRecommendation() {
     recommendation.current = { recommendation: null, index: 0 }
   }
@@ -154,11 +164,15 @@ function Screens({
           onDeleted={removeItems}
         />
       )
+    case 'draftPhoto':
+      return <PhotoScreen url={screen.url} caption={screen.caption} onBack={back} />
+
     case 'add':
       return (
         <AddItemScreen
           options={options}
           onBack={back}
+          onOpenPhoto={openDraftPhoto}
           onAdded={(item) => {
             forgetRecommendation()
             setItems((current) => [item, ...current])
@@ -201,7 +215,7 @@ function Screens({
         )
       }
       if (screen.kind === 'photo') {
-        return <PhotoScreen item={item} onBack={back} />
+        return <PhotoScreen url={item.photo_url} caption={item.name} onBack={back} />
       }
       if (screen.kind === 'edit') {
         return (
@@ -209,6 +223,7 @@ function Screens({
             options={options}
             item={item}
             onBack={back}
+            onOpenPhoto={openDraftPhoto}
             onSaved={(updated) => {
               replaceItem(updated)
               back()

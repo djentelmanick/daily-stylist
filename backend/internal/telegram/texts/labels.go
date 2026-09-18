@@ -83,9 +83,9 @@ var itemStatusLabels = map[domain.ItemStatus]string{
 }
 
 var warmthLevelLabels = map[domain.WarmthLevel]string{
-	domain.WarmthLevelLight:   "Лёгкая, от +20 °C",
-	domain.WarmthLevelMedium:  "Средняя, от +10 до +20 °C",
-	domain.WarmthLevelWarm:    "Тёплая, от 0 до +10 °C",
-	domain.WarmthLevelHeavy:   "Зимняя, от −10 до 0 °C",
+	domain.WarmthLevelLight:   "Для жары, от +20 °C",
+	domain.WarmthLevelMedium:  "Для тепла, от +10 до +20 °C",
+	domain.WarmthLevelWarm:    "Для прохлады, от 0 до +10 °C",
+	domain.WarmthLevelHeavy:   "Для холода, от −10 до 0 °C",
 	domain.WarmthLevelExtreme: "Для мороза, ниже −10 °C",
 }

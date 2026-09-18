@@ -7,6 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"maps"
+	"slices"
+	"strings"
 	"time"
 )
 
@@ -27,6 +30,12 @@ var photoExtensions = map[string]string{
 	"image/jpeg": ".jpg",
 	"image/png":  ".png",
 	"image/webp": ".webp",
+}
+
+func PhotoTypes() []string {
+	types := slices.Collect(maps.Keys(photoExtensions))
+	slices.Sort(types)
+	return types
 }
 
 type Photos struct {
@@ -56,7 +65,7 @@ func (photos *Photos) RequestUpload(ctx context.Context, userID int64, contentTy
 
 	photos.cleanAbandoned(ctx, userID)
 
-	key := fmt.Sprintf("users/%d/%s%s", userID, randomName(), extension)
+	key := userPrefix(userID) + randomName() + extension
 	if err := photos.uploads.Create(ctx, userID, key); err != nil {
 		return PhotoUpload{}, fmt.Errorf("загрузка фотографии: %w", err)
 	}
@@ -98,6 +107,19 @@ func (photos *Photos) Confirm(ctx context.Context, userID int64, key string) (er
 	return nil
 }
 
+// Проверка по пути, а не по записи о загрузке: у сохранённой вещи записи уже нет.
+func (photos *Photos) Content(ctx context.Context, userID int64, key string) (PhotoContent, error) {
+	if !strings.HasPrefix(key, userPrefix(userID)) {
+		return PhotoContent{}, fmt.Errorf("фотография %q: %w", key, ErrPhotoNotUploaded)
+	}
+
+	content, err := photos.storage.Read(ctx, key)
+	if err != nil {
+		return PhotoContent{}, fmt.Errorf("фотография %q: %w", key, err)
+	}
+	return content, nil
+}
+
 func (photos *Photos) Link(ctx context.Context, key string) (string, error) {
 	url, err := photos.storage.DownloadLink(ctx, key, downloadLinkTTL)
 	if err != nil {
@@ -124,6 +146,10 @@ func (photos *Photos) cleanAbandoned(ctx context.Context, userID int64) {
 		return
 	}
 	photos.Discard(ctx, keys...)
+}
+
+func userPrefix(userID int64) string {
+	return fmt.Sprintf("users/%d/", userID)
 }
 
 func randomName() string {

@@ -152,6 +152,63 @@ func TestRecommend_Rain(t *testing.T) {
 	}
 }
 
+func TestRecommend_UmbrellaAndRaincoatGoToDifferentOutfits(t *testing.T) {
+	var wardrobe testWardrobe
+	wardrobe.add("Футболка", domain.CategoryTop, domain.WarmthLevelMedium, domain.ColorWhite)
+	wardrobe.add("Джинсы", domain.CategoryBottom, domain.WarmthLevelMedium, domain.ColorBlue)
+	wardrobe.add("Кеды", domain.CategoryShoes, domain.WarmthLevelMedium, domain.ColorWhite)
+	wardrobe.add("Зонт", domain.CategoryUmbrella, 0, domain.ColorBlack)
+	wardrobe.add("Дождевик", domain.CategoryOuterwear, domain.WarmthLevelMedium, domain.ColorYellow).Waterproof = true
+
+	weather := feelsLike(17)
+	weather.PrecipitationChanceMax = 80
+	weather.WindSpeedMax = 3
+
+	outfits, _ := Recommend(Input{Items: wardrobe.items, Weather: weather, Season: domain.SeasonAutumn})
+
+	withUmbrella, withRaincoat := 0, 0
+	for _, outfit := range outfits {
+		umbrella := slices.Contains(names(outfit), "Зонт")
+		raincoat := slices.Contains(names(outfit), "Дождевик")
+		if umbrella && raincoat {
+			t.Errorf("зонт и дождевик в одном образе: %v", names(outfit))
+		}
+		if umbrella {
+			withUmbrella++
+		}
+		if raincoat {
+			withRaincoat++
+		}
+		if containsNote(outfit.Notes, domain.Note{Kind: domain.NoteNoRainProtection}) {
+			t.Errorf("образ %v защищён от дождя, но жалуется, что нет защиты", names(outfit))
+		}
+	}
+
+	if withUmbrella == 0 || withRaincoat == 0 {
+		t.Errorf("образов с зонтом %d, с дождевиком %d, ожидались и те, и другие", withUmbrella, withRaincoat)
+	}
+}
+
+func TestRecommend_NoRaincoatWithoutRain(t *testing.T) {
+	var wardrobe testWardrobe
+	wardrobe.add("Футболка", domain.CategoryTop, domain.WarmthLevelMedium, domain.ColorWhite)
+	wardrobe.add("Джинсы", domain.CategoryBottom, domain.WarmthLevelMedium, domain.ColorBlue)
+	wardrobe.add("Кеды", domain.CategoryShoes, domain.WarmthLevelMedium, domain.ColorWhite)
+	wardrobe.add("Зонт", domain.CategoryUmbrella, 0, domain.ColorBlack)
+	wardrobe.add("Дождевик", domain.CategoryOuterwear, domain.WarmthLevelMedium, domain.ColorYellow).Waterproof = true
+
+	outfits, _ := Recommend(Input{Items: wardrobe.items, Weather: feelsLike(17), Season: domain.SeasonAutumn})
+
+	if len(outfits) == 0 {
+		t.Fatal("образов нет")
+	}
+	for _, outfit := range outfits {
+		if slices.Contains(names(outfit), "Зонт") || slices.Contains(names(outfit), "Дождевик") {
+			t.Errorf("без дождя образ = %v", names(outfit))
+		}
+	}
+}
+
 func TestRecommend_SunglassesOnlyWhenSunny(t *testing.T) {
 	for _, test := range []struct {
 		name      string

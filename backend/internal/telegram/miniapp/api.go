@@ -35,6 +35,10 @@ type photos interface {
 	Link(ctx context.Context, key string) (string, error)
 }
 
+type recognition interface {
+	FromPhoto(ctx context.Context, userID int64, key string) (service.ItemSuggestion, error)
+}
+
 type locations interface {
 	SearchCities(ctx context.Context, query string) ([]domain.Location, error)
 	SetLocation(ctx context.Context, userID int64, location domain.Location) error
@@ -45,10 +49,24 @@ type endpoints struct {
 	recommender recommender
 	locations   locations
 	photos      photos
+	recognition recognition
 }
 
-func NewHandler(botToken string, wardrobe wardrobe, recommender recommender, locations locations, photos photos) http.Handler {
-	api := &endpoints{wardrobe: wardrobe, recommender: recommender, locations: locations, photos: photos}
+func NewHandler(
+	botToken string,
+	wardrobe wardrobe,
+	recommender recommender,
+	locations locations,
+	photos photos,
+	recognition recognition,
+) http.Handler {
+	api := &endpoints{
+		wardrobe:    wardrobe,
+		recommender: recommender,
+		locations:   locations,
+		photos:      photos,
+		recognition: recognition,
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/options", api.options)
@@ -59,6 +77,7 @@ func NewHandler(botToken string, wardrobe wardrobe, recommender recommender, loc
 	// Не DELETE с телом: тело у DELETE не определено стандартом, и прокси вправе его выбросить.
 	mux.HandleFunc("POST /api/items/delete", api.deleteItems)
 	mux.HandleFunc("POST /api/photos", api.requestPhotoUpload)
+	mux.HandleFunc("POST /api/photos/recognize", api.recognizePhoto)
 	mux.HandleFunc("GET /api/recommendation", api.recommend)
 	mux.HandleFunc("GET /api/outfits/today", api.todayOutfit)
 	mux.HandleFunc("PUT /api/outfits/today", api.wearToday)
@@ -85,10 +104,10 @@ type warmthLevelOption struct {
 }
 
 type textLimits struct {
-	Name        int `json:"name"`
-	Description int `json:"description"`
-	// Форма отсеет слишком большой файл до загрузки.
-	PhotoBytes int64 `json:"photo_bytes"`
+	Name        int      `json:"name"`
+	Description int      `json:"description"`
+	PhotoBytes  int64    `json:"photo_bytes"`
+	PhotoTypes  []string `json:"photo_types"`
 }
 
 type optionsResponse struct {
@@ -110,6 +129,7 @@ func (api *endpoints) options(writer http.ResponseWriter, request *http.Request)
 			Name:        domain.MaxNameLength,
 			Description: domain.MaxDescriptionLength,
 			PhotoBytes:  service.MaxPhotoBytes,
+			PhotoTypes:  service.PhotoTypes(),
 		},
 	}
 	for _, category := range domain.AllCategories() {
@@ -335,6 +355,42 @@ func (api *endpoints) requestPhotoUpload(writer http.ResponseWriter, request *ht
 	writeJSON(writer, http.StatusCreated, photoUploadResponse{Key: upload.Key, UploadURL: upload.URL, ViewURL: upload.ViewURL})
 }
 
+type recognizeRequest struct {
+	PhotoKey string `json:"photo_key"`
+}
+
+type suggestionResponse struct {
+	Name        string   `json:"name"`
+	Category    string   `json:"category"`
+	MainColor   string   `json:"main_color"`
+	ExtraColors []string `json:"extra_colors"`
+	Seasons     []string `json:"seasons"`
+	WarmthLevel int      `json:"warmth_level"`
+	Waterproof  bool     `json:"waterproof"`
+}
+
+func (api *endpoints) recognizePhoto(writer http.ResponseWriter, request *http.Request) {
+	var body recognizeRequest
+	if !decodeBody(writer, request, &body) {
+		return
+	}
+
+	suggestion, err := api.recognition.FromPhoto(request.Context(), userIDFrom(request.Context()), body.PhotoKey)
+	if err != nil {
+		writeFailure(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, suggestionResponse{
+		Name:        suggestion.Name,
+		Category:    string(suggestion.Category),
+		MainColor:   string(suggestion.Colors.Main),
+		ExtraColors: toStrings(suggestion.Colors.Extra),
+		Seasons:     toStrings(suggestion.Seasons),
+		WarmthLevel: int(suggestion.WarmthLevel),
+		Waterproof:  suggestion.Waterproof,
+	})
+}
+
 func decodeBody(writer http.ResponseWriter, request *http.Request, body any) bool {
 	decoder := json.NewDecoder(http.MaxBytesReader(writer, request.Body, maxRequestBodyBytes))
 	decoder.DisallowUnknownFields()
@@ -377,6 +433,9 @@ func writeFailure(writer http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrPhotoNotUploaded):
 		log.Printf("miniapp: %v", err)
 		writeError(writer, http.StatusUnprocessableEntity, "photo_not_uploaded")
+	case errors.Is(err, service.ErrRecognitionUnavailable):
+		log.Printf("miniapp: %v", err)
+		writeError(writer, http.StatusBadGateway, "recognition_unavailable")
 	case errors.Is(err, service.ErrWeatherUnavailable):
 		log.Printf("miniapp: %v", err)
 		writeError(writer, http.StatusBadGateway, "weather_unavailable")
