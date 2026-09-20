@@ -1,0 +1,49 @@
+name: vision
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "vision/**"
+      - ".github/workflows/vision.yml"
+  pull_request:
+    paths:
+      - "vision/**"
+      - ".github/workflows/vision.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vision-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    working-directory: vision
+
+jobs:
+  check:
+    name: format, lint, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: vision/pyproject.toml
+
+      - name: install
+        run: pip install -e '.[dev]'
+
+      - name: ruff format
+        run: ruff format --check .
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: test
+        run: pytest -q
+

@@ -251,14 +251,18 @@ go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 make check-vision
 ```
 
-Если правится `contracts/vision.proto`, код для Go и Python перегенерируется командой `make proto`. Ей нужны плагины protoc, они ставятся один раз:
+Эти же проверки гоняет CI.
+
+Если правится `contracts/vision.proto`, код для Go и Python перегенерируется командой `make proto`. Ей нужны плагины protoc тех же версий, что в CI, они ставятся один раз:
 
 ```bash
-go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
-go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
 ```
 
 Сам protoc ставить не нужно: он приезжает с пакетом `grpcio-tools` в окружении `vision/.venv`.
+
+Сгенерированный код лежит в репозитории, и отдельный воркфлоу CI повторяет `make proto` и падает, если результат разошёлся с закоммиченным. Сам по себе рассинхрон почти ничем себя не выдаёт: у Go он ломает сборку, только когда код уже обращается к новому полю, у Python молчит до рантайма.
 
 Живой запрос к GigaChat проверяется отдельно и тратит токены, поэтому в `make check` не входит:
 

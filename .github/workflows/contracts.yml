@@ -1,0 +1,61 @@
+name: contracts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts/**"
+      - "backend/internal/adapter/recognizers/vision/visionpb/**"
+      - "vision/app/generated/**"
+      - "Makefile"
+      - ".github/workflows/contracts.yml"
+  pull_request:
+    paths:
+      - "contracts/**"
+      - "backend/internal/adapter/recognizers/vision/visionpb/**"
+      - "vision/app/generated/**"
+      - "Makefile"
+      - ".github/workflows/contracts.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  generated:
+    name: generated code matches vision.proto
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: install protoc
+        run: pip install "$(grep -o 'grpcio-tools==[0-9.]*' vision/pyproject.toml)"
+
+      - name: install protoc plugins
+        run: |
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: generate
+        run: make proto PROTOC_PYTHON=python
+
+      - name: diff
+        run: |
+          generated="backend/internal/adapter/recognizers/vision/visionpb vision/app/generated"
+          if ! git diff --exit-code -- $generated; then
+            echo "::error::Код разошёлся с contracts/vision.proto, выполните make proto и закоммитьте результат"
+            exit 1
+          fi

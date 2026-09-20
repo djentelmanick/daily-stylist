@@ -8,6 +8,7 @@ export GIGACHAT_AUTH_KEY GIGACHAT_AUTH_URL GIGACHAT_BASE_URL GIGACHAT_SCOPE GIGA
 
 COMPOSE = docker compose --env-file backend/.env -f deploy/docker-compose.yml
 GO_MODULE = github.com/djentelmanick/daily-stylist/backend
+PROTOC_PYTHON ?= $(CURDIR)/vision/.venv/bin/python
 
 help:
 	@echo "Сначала база: make db. Остальное - каждое в своём терминале, начиная с туннеля:"
@@ -70,13 +71,13 @@ migration:
 proto:
 	@command -v protoc-gen-go >/dev/null && command -v protoc-gen-go-grpc >/dev/null || { \
 		echo "нет плагинов protoc. Поставьте их:"; \
-		echo "  go install google.golang.org/protobuf/cmd/protoc-gen-go@latest"; \
-		echo "  go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest"; exit 1; }
-	@test -x vision/.venv/bin/python || { echo "нет окружения Python: make vision-venv"; exit 1; }
-	cd backend && ../vision/.venv/bin/python -m grpc_tools.protoc --proto_path=../contracts \
+		echo "  go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.10"; \
+		echo "  go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1"; exit 1; }
+	@command -v $(PROTOC_PYTHON) >/dev/null || { echo "нет окружения Python: make vision-venv"; exit 1; }
+	cd backend && $(PROTOC_PYTHON) -m grpc_tools.protoc --proto_path=../contracts \
 		--go_out=. --go_opt=module=$(GO_MODULE) \
 		--go-grpc_out=. --go-grpc_opt=module=$(GO_MODULE) vision.proto
-	cd vision && .venv/bin/python -m grpc_tools.protoc --proto_path=../contracts \
+	cd vision && $(PROTOC_PYTHON) -m grpc_tools.protoc --proto_path=../contracts \
 		--python_out=app/generated --pyi_out=app/generated --grpc_python_out=app/generated vision.proto
 	@# Сгенерированный модуль импортирует сосед по пакету, а protoc пишет импорт верхнего уровня.
 	cd vision && sed -i 's/^import vision_pb2 as/from . import vision_pb2 as/' app/generated/vision_pb2_grpc.py

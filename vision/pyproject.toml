@@ -18,8 +18,8 @@ export = [
 ]
 dev = [
     "pytest>=8.3",
-    "ruff>=0.7",
-    "grpcio-tools>=1.68",
+    "ruff==0.16.8",
+    "grpcio-tools==1.84.0",
 ]
 
 [build-system]
