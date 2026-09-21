@@ -81,8 +81,16 @@ func run() error {
 		WebhookPath:    cfg.WebhookPath,
 		WebhookSecret:  cfg.WebhookSecret,
 		ListenAddr:     cfg.ListenAddr,
-		MiniApp:        miniapp.NewHandler(cfg.Token, wardrobe, recommender, service.NewLocations(locations, weather), photos, recognition),
-	}, handlers.Default)
+		MiniApp: miniapp.NewHandler(
+			cfg.Token,
+			wardrobe,
+			recommender,
+			service.NewLocations(locations, weather),
+			service.NewSettings(postgres.NewSettingsRepository(pool)),
+			photos,
+			recognition,
+		),
+	}, handlers.New(recommender))
 	if err != nil {
 		return err
 	}

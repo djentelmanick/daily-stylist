@@ -64,9 +64,39 @@ h1 {
 
 .home-header {
   display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-top: 8px;
+}
+
+.home-header > div {
+  display: flex;
   flex-direction: column;
   gap: 4px;
-  padding-top: 8px;
+}
+
+.outfit-arrows {
+  display: flex;
+  gap: 8px;
+}
+
+.icon-button:disabled {
+  opacity: 0.5;
+}
+
+.icon-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--hint);
+  background: var(--surface);
+  cursor: pointer;
 }
 
 .home-header h1 {
@@ -185,6 +215,7 @@ h1 {
 .item-header-photo,
 .photo-open,
 .button,
+.icon-button,
 .submit {
   transition: transform 0.12s ease;
   -webkit-tap-highlight-color: transparent;
@@ -197,6 +228,7 @@ h1 {
 .item-header-photo:active,
 .photo-open:active:enabled,
 .button:active:enabled,
+.icon-button:active:enabled,
 .submit:active:enabled {
   transform: scale(0.97);
 }
@@ -283,7 +315,9 @@ h1 {
   background: var(--surface);
 }
 
-.weather-city {
+.weather-city,
+.card-row,
+.outfit-pager {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -466,6 +500,11 @@ h1 {
   cursor: default;
 }
 
+input[type='time'] {
+  width: fit-content;
+  font-variant-numeric: tabular-nums;
+}
+
 .properties {
   display: flex;
   flex-direction: column;
@@ -568,6 +607,7 @@ h1 {
 }
 
 input[type='text'],
+input[type='time'],
 textarea {
   padding: 12px;
   border: 0;
@@ -582,6 +622,7 @@ textarea {
 }
 
 input[type='text']:focus,
+input[type='time']:focus,
 textarea:focus {
   outline: 2px solid var(--accent);
 }

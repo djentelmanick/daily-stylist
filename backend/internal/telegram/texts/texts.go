@@ -5,6 +5,13 @@ import "fmt"
 // Название кнопки меню задаётся в BotFather
 const MenuButton = "Гардероб"
 
+const (
+	MoreOutfits = "Ещё варианты"
+	Wear        = "Надеваю"
+	Worn        = "Записал. В ближайшие дни постараюсь не повторять эту одежду."
+	WearFailed  = "Не получилось записать. Попробуйте в приложении."
+)
+
 func Welcome(firstName string) string {
 	greeting := "Привет!"
 	if firstName != "" {

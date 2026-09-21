@@ -1,4 +1,4 @@
-.PHONY: help db db-down vision vision-build psql migrate migrate-status migrate-down migration proto tun back front vision-venv check check-back check-db check-s3 check-vision check-gigachat check-front
+.PHONY: help db db-down vision vision-build psql migrate migrate-status migrate-down migration proto tun back sched front vision-venv check check-back check-db check-s3 check-vision check-gigachat check-front
 
 -include backend/.env
 
@@ -19,6 +19,7 @@ help:
 	@echo "  make psql    - консоль базы"
 	@echo "  make tun     - туннель ngrok на Vite (порт 5173)"
 	@echo "  make back    - Go-бот и API Mini App (порт 2000)"
+	@echo "  make sched   - планировщик утренней рассылки"
 	@echo "  make front   - dev-сервер Vite"
 	@echo ""
 	@echo "Миграции:"
@@ -90,6 +91,9 @@ tun:
 
 back:
 	cd backend && go run ./cmd/bot
+
+sched:
+	cd backend && go run ./cmd/scheduler
 
 front:
 	cd frontend && npm run dev

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 
 type TelegramWebApp = {
   initData: string
+  colorScheme?: 'light' | 'dark'
   ready: () => void
   expand: () => void
   isVersionAtLeast: (version: string) => boolean
@@ -28,6 +29,11 @@ const webApp = window.Telegram?.WebApp
 export function initTelegram(): void {
   webApp?.ready()
   webApp?.expand()
+  // Тему Telegram отдаёт переменными, а нативные поля вроде выбора времени смотрят
+  // на color-scheme: без него в тёмной теме они остаются светлыми.
+  if (webApp?.colorScheme !== undefined) {
+    document.documentElement.style.colorScheme = webApp.colorScheme
+  }
 }
 
 export function getInitData(): string {

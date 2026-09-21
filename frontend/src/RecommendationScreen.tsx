@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ApiError, fetchRecommendation, labelOf, wearToday, type Options, type Recommendation } from './api'
 import { useBackButton } from './telegram'
 import { errorText, texts } from './texts'
-import { Dots, ItemMark, Thinking } from './ui'
+import { Chevron, Dots, ItemMark, Thinking } from './ui'
 
 export type RecommendationMemory = {
   recommendation: Recommendation | null
@@ -125,8 +125,8 @@ function RecommendationView({
   const outfit = outfits.at(index)
   const worn = outfit !== undefined && sameItems(outfit.items.map((item) => item.id), wornItemIds)
 
-  function showNext() {
-    const next = (index + 1) % outfits.length
+  function show(step: number) {
+    const next = (index + step + outfits.length) % outfits.length
     memory.index = next
     setIndex(next)
     setError('')
@@ -174,7 +174,31 @@ function RecommendationView({
       ) : (
         <>
           <section className="outfit">
-            {outfits.length > 1 && <p className="hint">{texts.outfitNumber(index + 1, outfits.length)}</p>}
+            {outfits.length > 1 && (
+              <div className="outfit-pager">
+                <p className="hint">{texts.outfitNumber(index + 1, outfits.length)}</p>
+                <div className="outfit-arrows">
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={texts.previousOutfit}
+                    disabled={saving}
+                    onClick={() => show(-1)}
+                  >
+                    <Chevron direction="left" />
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={texts.nextOutfit}
+                    disabled={saving}
+                    onClick={() => show(1)}
+                  >
+                    <Chevron direction="right" />
+                  </button>
+                </div>
+              </div>
+            )}
             <ul className="item-list">
               {outfit.items.map((item) => (
                 <li key={item.id}>
@@ -193,12 +217,9 @@ function RecommendationView({
           <Notes notes={outfit.notes} />
           {error !== '' && <p className="notice notice-error">{error}</p>}
 
+          {worn && <p className="hint">{texts.wornHint}</p>}
+
           <div className="actions">
-            {outfits.length > 1 && (
-              <button type="button" className="button" disabled={saving} onClick={showNext}>
-                {texts.anotherOutfit}
-              </button>
-            )}
             <button type="button" className="button button-accent" disabled={saving || worn} onClick={wear}>
               {worn ? (
                 texts.worn
@@ -212,7 +233,6 @@ function RecommendationView({
               )}
             </button>
           </div>
-          {worn && <p className="hint">{texts.wornHint}</p>}
         </>
       )}
     </div>

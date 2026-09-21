@@ -3,6 +3,8 @@ package texts
 import (
 	"fmt"
 	"math"
+	"slices"
+	"strings"
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
 )
@@ -73,4 +75,21 @@ func degrees(value float64) string {
 	default:
 		return "0"
 	}
+}
+
+func Morning(location domain.Location, weather domain.Weather, outfit domain.Outfit, notes []domain.Note) string {
+	lines := []string{"Доброе утро!", "", location.Name + ", " + Temperature(weather)}
+	lines = append(lines, WeatherDetails(weather)...)
+
+	items := slices.Clone(outfit.Items)
+	domain.SortForWearing(items)
+	lines = append(lines, "", "Что надеть:")
+	for _, item := range items {
+		lines = append(lines, "• "+item.Name)
+	}
+
+	for _, note := range slices.Concat(notes, outfit.Notes) {
+		lines = append(lines, "", Note(note))
+	}
+	return strings.Join(lines, "\n")
 }

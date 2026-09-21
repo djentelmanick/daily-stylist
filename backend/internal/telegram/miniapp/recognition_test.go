@@ -11,7 +11,7 @@ import (
 )
 
 func newHandlerWithRecognition(recognition recognition) http.Handler {
-	return NewHandler(testBotToken, failingWardrobe{}, &stubRecommender{}, nil, &stubPhotos{}, recognition)
+	return NewHandler(testBotToken, failingWardrobe{}, &stubRecommender{}, nil, nil, &stubPhotos{}, recognition)
 }
 
 func TestRecognizePhoto_ReturnsFieldsForTheForm(t *testing.T) {

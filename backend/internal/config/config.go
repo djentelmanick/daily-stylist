@@ -142,6 +142,27 @@ func (recognition Recognition) uses(name string) bool {
 	return recognition.Primary == name || recognition.Fallback == name
 }
 
+type Scheduler struct {
+	Token       string
+	MiniAppURL  string
+	DatabaseURL string
+}
+
+func LoadScheduler() (Scheduler, error) {
+	var env envReader
+
+	cfg := Scheduler{
+		Token:       env.required("TELEGRAM_BOT_TOKEN"),
+		MiniAppURL:  env.required("TELEGRAM_WEBHOOK_BASE_URL"),
+		DatabaseURL: env.required("DATABASE_URL"),
+	}
+	if err := env.err(); err != nil {
+		return Scheduler{}, err
+	}
+
+	return cfg, nil
+}
+
 type Migrate struct {
 	DatabaseURL string
 }

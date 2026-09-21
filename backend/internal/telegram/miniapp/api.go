@@ -42,12 +42,19 @@ type recognition interface {
 type locations interface {
 	SearchCities(ctx context.Context, query string) ([]domain.Location, error)
 	SetLocation(ctx context.Context, userID int64, location domain.Location) error
+	City(ctx context.Context, userID int64) (domain.Location, error)
+}
+
+type settings interface {
+	Get(ctx context.Context, userID int64) (domain.Settings, error)
+	Save(ctx context.Context, userID int64, settings domain.Settings) error
 }
 
 type endpoints struct {
 	wardrobe    wardrobe
 	recommender recommender
 	locations   locations
+	settings    settings
 	photos      photos
 	recognition recognition
 }
@@ -57,6 +64,7 @@ func NewHandler(
 	wardrobe wardrobe,
 	recommender recommender,
 	locations locations,
+	settings settings,
 	photos photos,
 	recognition recognition,
 ) http.Handler {
@@ -64,6 +72,7 @@ func NewHandler(
 		wardrobe:    wardrobe,
 		recommender: recommender,
 		locations:   locations,
+		settings:    settings,
 		photos:      photos,
 		recognition: recognition,
 	}
@@ -83,6 +92,8 @@ func NewHandler(
 	mux.HandleFunc("PUT /api/outfits/today", api.wearToday)
 	mux.HandleFunc("GET /api/cities", api.searchCities)
 	mux.HandleFunc("PUT /api/city", api.setCity)
+	mux.HandleFunc("GET /api/settings", api.getSettings)
+	mux.HandleFunc("PUT /api/settings", api.saveSettings)
 
 	return requireUser(botToken, mux)
 }
@@ -424,6 +435,9 @@ func writeFailure(writer http.ResponseWriter, err error) {
 		writeError(writer, http.StatusUnprocessableEntity, "invalid_location")
 	case errors.Is(err, service.ErrLocationNotSet):
 		writeError(writer, http.StatusConflict, "location_not_set")
+	case errors.Is(err, domain.ErrInvalidSettings):
+		log.Printf("miniapp: %v", err)
+		writeError(writer, http.StatusUnprocessableEntity, "invalid_settings")
 	case errors.Is(err, service.ErrPhotoTooLarge):
 		log.Printf("miniapp: %v", err)
 		writeError(writer, http.StatusUnprocessableEntity, "photo_too_large")

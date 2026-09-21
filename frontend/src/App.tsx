@@ -5,6 +5,7 @@ import { HomeScreen } from './HomeScreen'
 import { AddItemScreen, EditItemScreen } from './ItemFormScreens'
 import { ItemScreen, PhotoScreen } from './ItemScreen'
 import { RecommendationScreen, type RecommendationMemory } from './RecommendationScreen'
+import { SettingsScreen } from './SettingsScreen'
 import { recall, remember } from './session'
 import { getInitData, useBackButton } from './telegram'
 import { errorTexts, texts } from './texts'
@@ -70,8 +71,9 @@ type Screen =
   | { kind: 'add' }
   | { kind: 'recommendation' }
   | { kind: 'city' }
+  | { kind: 'settings' }
 
-const screenKinds = ['home', 'wardrobe', 'item', 'edit', 'photo', 'draftPhoto', 'add', 'recommendation', 'city']
+const screenKinds = ['home', 'wardrobe', 'item', 'edit', 'photo', 'draftPhoto', 'add', 'recommendation', 'city', 'settings']
 const openScreens = 'screens'
 
 // Телефон и Telegram перезагружают страницу когда угодно - например, пока открыт
@@ -79,7 +81,10 @@ const openScreens = 'screens'
 function restoreScreens(): Screen[] {
   const stored = recall<Screen[]>(openScreens)
   if (stored === null || stored.length === 0 || !stored.every((screen) => screenKinds.includes(screen?.kind))) {
-    return [{ kind: 'home' }]
+    // Кнопка «Ещё варианты» в утреннем сообщении открывает приложение сразу на подборе.
+    return new URLSearchParams(window.location.search).get('screen') === 'recommendation'
+      ? [{ kind: 'home' }, { kind: 'recommendation' }]
+      : [{ kind: 'home' }]
   }
   return stored
 }
@@ -150,6 +155,7 @@ function Screens({
           onOpenWardrobe={() => open({ kind: 'wardrobe' })}
           onAddItem={() => open({ kind: 'add' })}
           onRecommend={() => open({ kind: 'recommendation' })}
+          onOpenSettings={() => open({ kind: 'settings' })}
         />
       )
     case 'wardrobe':
@@ -192,6 +198,8 @@ function Screens({
           onAddItem={() => open({ kind: 'add' })}
         />
       )
+    case 'settings':
+      return <SettingsScreen onBack={back} onChooseCity={() => open({ kind: 'city' })} />
     case 'city':
       return (
         <CityScreen

@@ -2,6 +2,7 @@ package texts_test
 
 import (
 	"slices"
+	"strings"
 	"testing"
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
@@ -46,5 +47,27 @@ func TestNoteCoversAllKinds(t *testing.T) {
 		if got := texts.Note(domain.Note{Kind: kind, Category: domain.CategoryShoes}); got == string(kind) {
 			t.Errorf("нет текста для заметки %q", kind)
 		}
+	}
+}
+
+func TestMorning(t *testing.T) {
+	weather := domain.Weather{TemperatureMin: 3, TemperatureMax: 8, FeelsLikeMin: 3, FeelsLikeMax: 8, PrecipitationChanceMax: 60}
+	outfit := domain.Outfit{
+		Items: []domain.Item{
+			{Name: "Кеды", Category: domain.CategoryShoes},
+			{Name: "Куртка", Category: domain.CategoryOuterwear},
+		},
+		Notes: []domain.Note{{Kind: domain.NoteWarmsUp}},
+	}
+
+	message := texts.Morning(domain.Location{Name: "Казань"}, weather, outfit, nil)
+
+	for _, want := range []string{"Казань, +3…+8 °C", "Дождь, вероятность 60 %", "Днём потеплеет"} {
+		if !strings.Contains(message, want) {
+			t.Errorf("в сообщении нет %q:\n%s", want, message)
+		}
+	}
+	if !strings.Contains(message, "• Куртка\n• Кеды") {
+		t.Errorf("вещи не в порядке надевания:\n%s", message)
 	}
 }

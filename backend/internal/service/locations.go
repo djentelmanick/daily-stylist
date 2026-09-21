@@ -45,3 +45,11 @@ func (locations *Locations) SetLocation(ctx context.Context, userID int64, locat
 	}
 	return nil
 }
+
+func (locations *Locations) City(ctx context.Context, userID int64) (domain.Location, error) {
+	location, err := locations.repository.Get(ctx, userID)
+	if err != nil {
+		return domain.Location{}, fmt.Errorf("город пользователя: %w", err)
+	}
+	return location, nil
+}

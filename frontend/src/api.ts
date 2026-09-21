@@ -68,6 +68,12 @@ export type City = {
   timezone: string
 }
 
+export type Settings = {
+  morning_enabled: boolean
+  send_at: string
+  city: City | null
+}
+
 export type Outfit = {
   items: Item[]
   notes: string[]
@@ -91,6 +97,7 @@ export type ApiErrorCode =
   | 'wardrobe_full'
   | 'invalid_location'
   | 'location_not_set'
+  | 'invalid_settings'
   | 'weather_unavailable'
   | 'photo_too_large'
   | 'photo_type_unsupported'
@@ -108,6 +115,7 @@ const serverErrorCodes: ApiErrorCode[] = [
   'wardrobe_full',
   'invalid_location',
   'location_not_set',
+  'invalid_settings',
   'weather_unavailable',
   'photo_too_large',
   'photo_type_unsupported',
@@ -201,6 +209,14 @@ export async function searchCities(query: string): Promise<City[]> {
 
 export function saveCity(city: City): Promise<void> {
   return request<void>('PUT', '/api/city', city)
+}
+
+export function fetchSettings(): Promise<Settings> {
+  return request<Settings>('GET', '/api/settings')
+}
+
+export function saveSettings(settings: { morning_enabled: boolean; send_at: string }): Promise<void> {
+  return request<void>('PUT', '/api/settings', settings)
 }
 
 async function request<T>(method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown): Promise<T> {

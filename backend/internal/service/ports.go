@@ -11,6 +11,7 @@ import (
 var (
 	ErrItemNotFound     = errors.New("вещь не найдена")
 	ErrLocationNotSet   = errors.New("город не выбран")
+	ErrSettingsNotSet   = errors.New("настройки не менялись")
 	ErrPhotoNotUploaded = errors.New("фотография не загружена")
 )
 
@@ -79,4 +80,32 @@ type Forecaster interface {
 
 type CitySearch interface {
 	SearchCities(ctx context.Context, query string) ([]domain.Location, error)
+}
+
+type SettingsRepository interface {
+	Get(ctx context.Context, userID int64) (domain.Settings, error)
+	Save(ctx context.Context, userID int64, settings domain.Settings) error
+}
+
+// Day - местный день пользователя, а не день сервера.
+type MorningDelivery struct {
+	UserID int64
+	Day    time.Time
+}
+
+type DueParams struct {
+	Now      time.Time
+	Window   time.Duration
+	Defaults domain.Settings
+}
+
+type DeliveryRepository interface {
+	Due(ctx context.Context, params DueParams) ([]MorningDelivery, error)
+	// Claim занимает день за отправителем, false - день уже занят.
+	Claim(ctx context.Context, delivery MorningDelivery) (bool, error)
+	Release(ctx context.Context, delivery MorningDelivery) error
+}
+
+type Notifier interface {
+	SendRecommendation(ctx context.Context, userID int64, recommendation Recommendation) error
 }
