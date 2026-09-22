@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { availableStatus, deleteItems, labelOf, type Item, type Options } from './api'
+import { archivedStatus, availableStatus, deleteItems, dirtyStatus, labelOf, type Item, type Options } from './api'
+import { matchesSearch, searchWords } from './search'
 import { confirm, useBackButton, vibrate } from './telegram'
 import { errorText, texts } from './texts'
-import { Dots, ItemMark } from './ui'
+import { Chip, Dots, ItemMark } from './ui'
 import { useLongPress } from './useLongPress'
 
 export function WardrobeScreen({
@@ -26,6 +27,8 @@ export function WardrobeScreen({
   const [selected, setSelected] = useState<number[] | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState('')
+  const [query, setQuery] = useState('')
+  const [filter, setFilter] = useState<Filter | null>(null)
 
   useBackButton(selected === null ? onBack : () => setSelected(null))
 
@@ -65,6 +68,20 @@ export function WardrobeScreen({
     }
   }
 
+  const inSeason = (item: Item) => item.seasons.includes(options.current_season)
+  const passes: Record<Filter, (item: Item) => boolean> = {
+    outOfSeason: (item) => !inSeason(item),
+    worn: (item) => wornItemIds.includes(item.id),
+    dirty: (item) => item.status === dirtyStatus,
+    archived: (item) => item.status === archivedStatus,
+  }
+  const words = searchWords(query)
+  const shown = items.filter(
+    (item) =>
+      (filter === null || passes[filter](item)) &&
+      matchesSearch(item, labelOf(options.categories, item.category), words),
+  )
+
   if (items.length === 0) {
     return (
       <div className="screen">
@@ -87,14 +104,30 @@ export function WardrobeScreen({
       </header>
       {selected === null && <p className="hint">{texts.selectHint}</p>}
 
+      <input
+        type="text"
+        value={query}
+        placeholder={texts.searchPlaceholder}
+        enterKeyHint="search"
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      <div className="chips">
+        {filters.map(({ value, label }) => (
+          <Chip key={value} selected={filter === value} onClick={() => setFilter(filter === value ? null : value)}>
+            {label}
+          </Chip>
+        ))}
+      </div>
+
+      {shown.length === 0 && <p className="hint">{texts.nothingFound}</p>}
       <ul className="item-list">
-        {items.map((item) => (
+        {shown.map((item) => (
           <ItemRow
             key={item.id}
             item={item}
             categoryLabel={labelOf(options.categories, item.category)}
             statusLabel={labelOf(options.statuses, item.status)}
-            inSeason={item.seasons.includes(options.current_season)}
+            inSeason={inSeason(item)}
             worn={wornItemIds.includes(item.id)}
             checked={selected?.includes(item.id) ?? null}
             onPress={() => (selected === null ? onOpenItem(item.id) : select(item.id))}
@@ -129,6 +162,15 @@ export function WardrobeScreen({
     </div>
   )
 }
+
+type Filter = 'outOfSeason' | 'worn' | 'dirty' | 'archived'
+
+const filters: { value: Filter; label: string }[] = [
+  { value: 'outOfSeason', label: texts.filterOutOfSeason },
+  { value: 'worn', label: texts.worn },
+  { value: 'dirty', label: texts.filterDirty },
+  { value: 'archived', label: texts.filterArchived },
+]
 
 function ItemRow({
   item,

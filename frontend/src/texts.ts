@@ -68,6 +68,9 @@ export const texts = {
   confirmDeleteMany: (count: number) => `Удалить ${items(count)}? Вернуть не получится.`,
 
   notInSeason: 'Не сезон',
+  filterOutOfSeason: 'Не по сезону',
+  filterDirty: 'Грязное',
+  filterArchived: 'В архиве',
   outOfSeasonNow: (season: string) => `Сейчас ${season.toLowerCase()}, вещь не по сезону`,
   status: 'Статус',
   colors: 'Цвета',

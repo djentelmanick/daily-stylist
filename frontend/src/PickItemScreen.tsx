@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchCandidates, labelOf, type Candidate, type Item, type Options } from './api'
+import { matchesSearch, searchWords } from './search'
 import { useBackButton } from './telegram'
 import { errorText, texts } from './texts'
 import { ItemMark, Thinking } from './ui'
@@ -60,7 +61,7 @@ export function PickItemScreen({
     }
   }
 
-  const words = normalize(query).split(/\s+/).filter((word) => word !== '')
+  const words = searchWords(query)
   const found =
     state.kind === 'ready'
       ? state.candidates.flatMap((candidate) => {
@@ -68,8 +69,9 @@ export function PickItemScreen({
           if (item === undefined) {
             return []
           }
-          const text = normalize(`${item.name} ${item.description} ${labelOf(options.categories, item.category)}`)
-          return words.every((word) => text.includes(word)) ? [{ item, notes: candidate.notes }] : []
+          return matchesSearch(item, labelOf(options.categories, item.category), words)
+            ? [{ item, notes: candidate.notes }]
+            : []
         })
       : []
 
@@ -119,8 +121,4 @@ export function PickItemScreen({
       {error !== '' && <p className="notice notice-error">{error}</p>}
     </div>
   )
-}
-
-function normalize(text: string): string {
-  return text.toLowerCase().replaceAll('ё', 'е')
 }

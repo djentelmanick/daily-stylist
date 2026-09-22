@@ -60,6 +60,8 @@ export type Suggestion = {
 }
 
 export const availableStatus = 'available'
+export const dirtyStatus = 'dirty'
+export const archivedStatus = 'archived'
 
 export type City = {
   name: string
