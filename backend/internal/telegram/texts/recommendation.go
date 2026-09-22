@@ -7,12 +7,13 @@ import (
 	"strings"
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
+	"github.com/djentelmanick/daily-stylist/backend/internal/domain/rules"
 )
 
+// О дожде и ветре сообщение предупреждает раньше, чем на них реагирует подбор.
 const (
 	showPrecipitationFrom = 30
 	showWindFrom          = 5.0
-	showUVIndexFrom       = 6.0
 )
 
 func Temperature(weather domain.Weather) string {
@@ -33,7 +34,7 @@ func WeatherDetails(weather domain.Weather) []string {
 	if weather.WindSpeedMax >= showWindFrom {
 		details = append(details, fmt.Sprintf("Ветер до %d м/с", int(math.Round(weather.WindSpeedMax))))
 	}
-	if weather.UVIndexMax >= showUVIndexFrom {
+	if weather.UVIndexMax >= rules.StrongUVIndex {
 		details = append(details, "Сильное солнце")
 	}
 	return details

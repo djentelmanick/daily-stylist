@@ -10,8 +10,8 @@ import (
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
 )
 
-func New(cfg config.Recognition) (service.PhotoRecognizer, func(), error) {
-	primary, closePrimary, err := byName(cfg.Primary, cfg)
+func New(cfg config.Recognition, counter service.RecognitionCounter) (service.PhotoRecognizer, func(), error) {
+	primary, closePrimary, err := byName(cfg.Primary, cfg, counter)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -20,7 +20,7 @@ func New(cfg config.Recognition) (service.PhotoRecognizer, func(), error) {
 		return primary, closePrimary, nil
 	}
 
-	secondary, closeSecondary, err := byName(cfg.Fallback, cfg)
+	secondary, closeSecondary, err := byName(cfg.Fallback, cfg, counter)
 	if err != nil {
 		closePrimary()
 		return nil, nil, err
@@ -33,7 +33,7 @@ func New(cfg config.Recognition) (service.PhotoRecognizer, func(), error) {
 	}, nil
 }
 
-func byName(name string, cfg config.Recognition) (service.PhotoRecognizer, func(), error) {
+func byName(name string, cfg config.Recognition, counter service.RecognitionCounter) (service.PhotoRecognizer, func(), error) {
 	switch name {
 	case config.RecognizerGigaChat:
 		client, err := gigachat.New(gigachat.Config{
@@ -47,7 +47,7 @@ func byName(name string, cfg config.Recognition) (service.PhotoRecognizer, func(
 		if err != nil {
 			return nil, nil, err
 		}
-		return client, func() {}, nil
+		return service.NewLimited(client, counter), func() {}, nil
 
 	case config.RecognizerVision:
 		client, err := vision.New(cfg.Vision.Address, cfg.Timeout)

@@ -26,6 +26,7 @@ export type Options = {
     description: number
     photo_bytes: number
     photo_types: string[]
+    min_city_query: number
   }
 }
 
@@ -104,6 +105,7 @@ export type ApiErrorCode =
   | 'photo_not_uploaded'
   | 'photo_upload_failed'
   | 'recognition_unavailable'
+  | 'recognition_limit'
   | 'internal'
   | 'network'
 
@@ -121,6 +123,7 @@ const serverErrorCodes: ApiErrorCode[] = [
   'photo_type_unsupported',
   'photo_not_uploaded',
   'recognition_unavailable',
+  'recognition_limit',
   'internal',
 ]
 

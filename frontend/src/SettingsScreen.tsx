@@ -4,8 +4,7 @@ import { useBackButton } from './telegram'
 import { errorText, texts } from './texts'
 import { Thinking } from './ui'
 
-// Время сохраняется не на каждую цифру: иначе запрос уходит после первой же,
-// а поле перерисовывается прямо посреди набора.
+// Не на каждую цифру: иначе поле перерисовывается прямо посреди набора.
 const saveDelayMs = 800
 
 export function SettingsScreen({ onBack, onChooseCity }: { onBack: () => void; onChooseCity: () => void }) {

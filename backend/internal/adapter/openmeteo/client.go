@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -22,6 +23,7 @@ const (
 	requestTimeout   = 5 * time.Second
 	maxResponseBytes = 1 << 20
 	maxCities        = 8
+	forecastCacheTTL = time.Hour
 )
 
 var (
@@ -29,15 +31,22 @@ var (
 	_ service.CitySearch = (*Client)(nil)
 )
 
+type Cache interface {
+	Get(ctx context.Context, key string) ([]byte, bool, error)
+	Set(ctx context.Context, key string, value []byte, ttl time.Duration) error
+}
+
 type Client struct {
 	http         *http.Client
+	cache        Cache
 	forecastURL  string
 	geocodingURL string
 }
 
-func NewClient() *Client {
+func NewClient(cache Cache) *Client {
 	return &Client{
 		http:         &http.Client{Timeout: requestTimeout},
+		cache:        cache,
 		forecastURL:  forecastURL,
 		geocodingURL: geocodingURL,
 	}
@@ -69,8 +78,12 @@ func (client *Client) Forecast(ctx context.Context, location domain.Location, fr
 		"timezone":      {location.TimeZone},
 		"forecast_days": {"2"},
 	}
+	raw, err := client.cachedForecast(ctx, query)
+	if err != nil {
+		return domain.Weather{}, fmt.Errorf("прогноз погоды: %w", err)
+	}
 	var body forecastResponse
-	if err := client.get(ctx, client.forecastURL, query, &body); err != nil {
+	if err := json.Unmarshal(raw, &body); err != nil {
 		return domain.Weather{}, fmt.Errorf("прогноз погоды: %w", err)
 	}
 	weather, err := body.Hourly.summary(from, to)
@@ -78,6 +91,30 @@ func (client *Client) Forecast(ctx context.Context, location domain.Location, fr
 		return domain.Weather{}, fmt.Errorf("прогноз погоды: %w", err)
 	}
 	return weather, nil
+}
+
+func (client *Client) cachedForecast(ctx context.Context, query url.Values) ([]byte, error) {
+	key := "openmeteo:forecast:" + query.Encode()
+	if client.cache != nil {
+		raw, found, err := client.cache.Get(ctx, key)
+		if err != nil {
+			log.Printf("openmeteo: %v", err)
+		}
+		if found {
+			return raw, nil
+		}
+	}
+
+	raw, err := client.fetch(ctx, client.forecastURL, query)
+	if err != nil {
+		return nil, err
+	}
+	if client.cache != nil {
+		if err := client.cache.Set(ctx, key, raw, forecastCacheTTL); err != nil {
+			log.Printf("openmeteo: %v", err)
+		}
+	}
+	return raw, nil
 }
 
 func (hourly hourlyForecast) summary(from, to time.Time) (domain.Weather, error) {
@@ -169,18 +206,26 @@ func region(name string, parts ...string) string {
 }
 
 func (client *Client) get(ctx context.Context, endpoint string, query url.Values, body any) error {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+query.Encode(), nil)
+	raw, err := client.fetch(ctx, endpoint, query)
 	if err != nil {
 		return err
 	}
+	return json.Unmarshal(raw, body)
+}
+
+func (client *Client) fetch(ctx context.Context, endpoint string, query url.Values) ([]byte, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+query.Encode(), nil)
+	if err != nil {
+		return nil, err
+	}
 	response, err := client.http.Do(request)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() { _ = response.Body.Close() }()
 
 	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("ответ %s", response.Status)
+		return nil, fmt.Errorf("ответ %s", response.Status)
 	}
-	return json.NewDecoder(io.LimitReader(response.Body, maxResponseBytes)).Decode(body)
+	return io.ReadAll(io.LimitReader(response.Body, maxResponseBytes))
 }

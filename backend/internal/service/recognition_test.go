@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
 )
@@ -17,7 +18,7 @@ type fakeRecognizer struct {
 	seen       PhotoContent
 }
 
-func (recognizer *fakeRecognizer) Recognize(_ context.Context, photo PhotoContent) (ItemSuggestion, error) {
+func (recognizer *fakeRecognizer) Recognize(_ context.Context, _ int64, photo PhotoContent) (ItemSuggestion, error) {
 	recognizer.calls++
 	recognizer.seen = photo
 	if recognizer.err != nil {
@@ -174,7 +175,7 @@ func TestFallback_AsksSecondOnlyWhenFirstFailed(t *testing.T) {
 	secondary := &fakeRecognizer{suggestion: ItemSuggestion{Name: "от запасного"}}
 	fallback := NewFallback(primary, secondary)
 
-	suggestion, err := fallback.Recognize(t.Context(), PhotoContent{Bytes: []byte("снимок")})
+	suggestion, err := fallback.Recognize(t.Context(), 42, PhotoContent{Bytes: []byte("снимок")})
 	if err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
@@ -192,7 +193,7 @@ func TestFallback_AsksSecondWhenFirstFailed(t *testing.T) {
 	secondary := &fakeRecognizer{suggestion: ItemSuggestion{Name: "от запасного"}}
 	fallback := NewFallback(primary, secondary)
 
-	suggestion, err := fallback.Recognize(t.Context(), PhotoContent{Bytes: []byte("снимок")})
+	suggestion, err := fallback.Recognize(t.Context(), 42, PhotoContent{Bytes: []byte("снимок")})
 	if err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
@@ -209,9 +210,90 @@ func TestFallback_BothFailedMeansNoSuggestion(t *testing.T) {
 	primary := &fakeRecognizer{err: ErrRecognitionUnavailable}
 	secondary := &fakeRecognizer{err: ErrRecognitionUnavailable}
 
-	_, err := NewFallback(primary, secondary).Recognize(t.Context(), PhotoContent{})
+	_, err := NewFallback(primary, secondary).Recognize(t.Context(), 42, PhotoContent{})
 
 	if !errors.Is(err, ErrRecognitionUnavailable) {
 		t.Errorf("ошибка = %v, ожидалась ErrRecognitionUnavailable", err)
 	}
+}
+
+func TestLimited_CountsEveryPhoto(t *testing.T) {
+	recognizer := &fakeRecognizer{suggestion: ItemSuggestion{Name: "Куртка"}}
+	counter := &fakeCounter{}
+	limited := NewLimited(recognizer, counter)
+
+	suggestion, err := limited.Recognize(t.Context(), 42, PhotoContent{})
+	if err != nil {
+		t.Fatalf("Recognize: %v", err)
+	}
+
+	if suggestion.Name != "Куртка" || recognizer.calls != 1 {
+		t.Errorf("подсказка = %+v, вызовов %d", suggestion, recognizer.calls)
+	}
+	if counter.counts[42] != 1 || counter.window != paidRecognitionWindow {
+		t.Errorf("засчитано %d за окно %s, ожидалось 1 за сутки", counter.counts[42], counter.window)
+	}
+}
+
+func TestLimited_StopsAfterDailyLimit(t *testing.T) {
+	recognizer := &fakeRecognizer{}
+	counter := &fakeCounter{counts: map[int64]int{42: PaidRecognitionsPerDay}}
+	limited := NewLimited(recognizer, counter)
+
+	_, err := limited.Recognize(t.Context(), 42, PhotoContent{})
+
+	if !errors.Is(err, ErrRecognitionLimit) {
+		t.Errorf("ошибка = %v, ожидалась ErrRecognitionLimit", err)
+	}
+	if recognizer.calls != 0 {
+		t.Error("платный распознаватель вызван сверх лимита")
+	}
+}
+
+func TestLimited_DoesNotSpendWhenCounterIsDown(t *testing.T) {
+	recognizer := &fakeRecognizer{}
+	limited := NewLimited(recognizer, &fakeCounter{err: errors.New("соединение сброшено")})
+
+	_, err := limited.Recognize(t.Context(), 42, PhotoContent{})
+
+	if !errors.Is(err, ErrRecognitionUnavailable) {
+		t.Errorf("ошибка = %v, ожидалась ErrRecognitionUnavailable", err)
+	}
+	if recognizer.calls != 0 {
+		t.Error("платный распознаватель вызван, хотя неизвестно, сколько уже потрачено")
+	}
+}
+
+func TestLimited_OverLimitGoesToFallback(t *testing.T) {
+	paid := &fakeRecognizer{}
+	own := &fakeRecognizer{suggestion: ItemSuggestion{Name: "от своей модели"}}
+	counter := &fakeCounter{counts: map[int64]int{42: PaidRecognitionsPerDay}}
+	recognizer := NewFallback(NewLimited(paid, counter), own)
+
+	suggestion, err := recognizer.Recognize(t.Context(), 42, PhotoContent{})
+	if err != nil {
+		t.Fatalf("Recognize: %v", err)
+	}
+
+	if suggestion.Name != "от своей модели" || paid.calls != 0 {
+		t.Errorf("подсказка = %+v, платный вызван %d раз", suggestion, paid.calls)
+	}
+}
+
+type fakeCounter struct {
+	counts map[int64]int
+	window time.Duration
+	err    error
+}
+
+func (counter *fakeCounter) Increment(_ context.Context, userID int64, window time.Duration) (int, error) {
+	if counter.err != nil {
+		return 0, counter.err
+	}
+	if counter.counts == nil {
+		counter.counts = map[int64]int{}
+	}
+	counter.counts[userID]++
+	counter.window = window
+	return counter.counts[userID], nil
 }

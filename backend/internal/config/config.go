@@ -43,6 +43,7 @@ type Bot struct {
 	WebhookSecret  string
 	ListenAddr     string
 	DatabaseURL    string
+	RedisURL       string
 	Photos         PhotoStorage
 	Recognition    Recognition
 }
@@ -86,6 +87,7 @@ func LoadBot() (Bot, error) {
 		WebhookSecret:  env.required("TELEGRAM_WEBHOOK_SECRET"),
 		ListenAddr:     env.optional("BOT_LISTEN_ADDR", defaultBotListenAddr),
 		DatabaseURL:    env.required("DATABASE_URL"),
+		RedisURL:       env.required("REDIS_URL"),
 		Photos: PhotoStorage{
 			Endpoint:  env.required("S3_ENDPOINT"),
 			PublicURL: env.required("S3_PUBLIC_URL"),
@@ -146,6 +148,7 @@ type Scheduler struct {
 	Token       string
 	MiniAppURL  string
 	DatabaseURL string
+	RedisURL    string
 }
 
 func LoadScheduler() (Scheduler, error) {
@@ -155,6 +158,7 @@ func LoadScheduler() (Scheduler, error) {
 		Token:       env.required("TELEGRAM_BOT_TOKEN"),
 		MiniAppURL:  env.required("TELEGRAM_WEBHOOK_BASE_URL"),
 		DatabaseURL: env.required("DATABASE_URL"),
+		RedisURL:    env.required("REDIS_URL"),
 	}
 	if err := env.err(); err != nil {
 		return Scheduler{}, err

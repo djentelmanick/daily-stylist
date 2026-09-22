@@ -9,7 +9,7 @@ const (
 	// При таком ветре зонт выворачивает.
 	strongWind    = 11.0
 	sunnyUVIndex  = 3.0
-	strongUVIndex = 6.0
+	StrongUVIndex = 6.0
 )
 
 type conditions struct {

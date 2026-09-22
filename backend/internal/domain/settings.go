@@ -11,7 +11,6 @@ var DefaultSendAt = DayTime{Hour: 7}
 
 var ErrInvalidSettings = errors.New("невалидные настройки")
 
-// Без даты и пояса: «семь утра» у каждого пользователя наступают в свой момент.
 type DayTime struct {
 	Hour   int
 	Minute int

@@ -13,6 +13,7 @@ import (
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/openmeteo"
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/postgres"
+	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/redis"
 	"github.com/djentelmanick/daily-stylist/backend/internal/config"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
 	"github.com/djentelmanick/daily-stylist/backend/internal/telegram"
@@ -50,6 +51,12 @@ func run() error {
 		return err
 	}
 
+	redisClient, err := redis.Connect(ctx, cfg.RedisURL)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = redisClient.Close() }()
+
 	notifier, err := telegram.NewNotifier(ctx, cfg.Token, cfg.MiniAppURL)
 	if err != nil {
 		return err
@@ -59,7 +66,7 @@ func run() error {
 		postgres.NewItemRepository(pool),
 		postgres.NewOutfitRepository(pool),
 		postgres.NewLocationRepository(pool),
-		openmeteo.NewClient(),
+		openmeteo.NewClient(redis.NewCache(redisClient)),
 		time.Now,
 	)
 	morning := service.NewMorning(postgres.NewDeliveryRepository(pool), recommender, notifier, time.Now)

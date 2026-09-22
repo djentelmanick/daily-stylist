@@ -10,11 +10,8 @@ import (
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
 )
 
-// Столько времени утренняя рекомендация ещё имеет смысл: перезапуск планировщика
-// или недолгая авария не съедают день, а позже человек уже оделся сам.
 const MorningWindow = time.Hour
 
-// Бота заблокировали или чат удалён: повторять отправку бессмысленно.
 var ErrChatUnavailable = errors.New("чат недоступен")
 
 type morningRecommender interface {
@@ -65,8 +62,7 @@ func (morning *Morning) send(ctx context.Context, delivery MorningDelivery) erro
 	if err != nil {
 		return morning.release(ctx, delivery, err)
 	}
-	// Подобрать нечего: гардероб пуст или не по погоде. Молчим, но день считаем
-	// разобранным - за оставшийся час гардероб вряд ли изменится.
+	// День не возвращаем: за оставшийся час гардероб вряд ли изменится.
 	if len(recommendation.Outfits) == 0 {
 		return nil
 	}

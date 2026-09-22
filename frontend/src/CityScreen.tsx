@@ -4,10 +4,17 @@ import { useBackButton } from './telegram'
 import { errorText, texts } from './texts'
 import { Thinking } from './ui'
 
-const minQueryLength = 2
 const searchDelayMs = 300
 
-export function CityScreen({ onBack, onSaved }: { onBack: () => void; onSaved: () => void }) {
+export function CityScreen({
+  minQueryLength,
+  onBack,
+  onSaved,
+}: {
+  minQueryLength: number
+  onBack: () => void
+  onSaved: () => void
+}) {
   useBackButton(onBack)
   const [query, setQuery] = useState('')
   const [found, setFound] = useState<{ query: string; cities: City[] } | null>(null)

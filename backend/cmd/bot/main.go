@@ -14,6 +14,7 @@ import (
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/openmeteo"
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/postgres"
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/recognizers"
+	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/redis"
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/s3"
 	"github.com/djentelmanick/daily-stylist/backend/internal/config"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
@@ -52,9 +53,15 @@ func run() error {
 		return err
 	}
 
+	redisClient, err := redis.Connect(ctx, cfg.RedisURL)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = redisClient.Close() }()
+
 	items := postgres.NewItemRepository(pool)
 	locations := postgres.NewLocationRepository(pool)
-	weather := openmeteo.NewClient()
+	weather := openmeteo.NewClient(redis.NewCache(redisClient))
 	photoStorage := s3.NewPhotoStorage(s3.Config{
 		Endpoint:  cfg.Photos.Endpoint,
 		PublicURL: cfg.Photos.PublicURL,
@@ -64,7 +71,7 @@ func run() error {
 		SecretKey: cfg.Photos.SecretKey,
 	})
 
-	recognizer, closeRecognizer, err := recognizers.New(cfg.Recognition)
+	recognizer, closeRecognizer, err := recognizers.New(cfg.Recognition, redis.NewRecognitionCounter(redisClient))
 	if err != nil {
 		return err
 	}

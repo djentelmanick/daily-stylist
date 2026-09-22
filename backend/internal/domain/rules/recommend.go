@@ -274,7 +274,7 @@ func (recommender recommender) outfit(look look) domain.Outfit {
 			notes = append(notes, domain.Note{Kind: domain.NoteMissing, Category: domain.CategoryHat})
 		}
 		add(near(wardrobe[domain.CategoryScarf], level), level)
-	} else if conditions.uvIndex >= strongUVIndex && !conditions.precipitation {
+	} else if conditions.uvIndex >= StrongUVIndex && !conditions.precipitation {
 		add(near(wardrobe[domain.CategoryHat], domain.WarmthLevelLight), domain.WarmthLevelLight)
 	}
 

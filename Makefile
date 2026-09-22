@@ -1,8 +1,8 @@
-.PHONY: help db db-down vision vision-build psql migrate migrate-status migrate-down migration proto tun back sched front vision-venv check check-back check-db check-s3 check-vision check-gigachat check-front
+.PHONY: help db db-down vision vision-build psql migrate migrate-status migrate-down migration proto redis-cli tun back sched front vision-venv check check-back check-db check-s3 check-redis check-vision check-gigachat check-front
 
 -include backend/.env
 
-export TEST_DATABASE_URL
+export TEST_DATABASE_URL TEST_REDIS_URL
 export TEST_S3_ENDPOINT TEST_S3_BUCKET S3_ACCESS_KEY S3_SECRET_KEY S3_REGION
 export GIGACHAT_AUTH_KEY GIGACHAT_AUTH_URL GIGACHAT_BASE_URL GIGACHAT_SCOPE GIGACHAT_MODEL
 
@@ -12,11 +12,12 @@ PROTOC_PYTHON ?= $(CURDIR)/vision/.venv/bin/python
 
 help:
 	@echo "Сначала база: make db. Остальное - каждое в своём терминале, начиная с туннеля:"
-	@echo "  make db      - Postgres и хранилище фотографий в docker, настройки из backend/.env"
+	@echo "  make db      - Postgres, Redis и хранилище фотографий в docker, настройки из backend/.env"
 	@echo "  make db-down - остановить их, данные сохранятся"
 	@echo "  make vision  - своя модель распознавания, нужна при RECOGNIZER=vision"
 	@echo "  make vision-build - пересобрать её образ после правок в vision/"
 	@echo "  make psql    - консоль базы"
+	@echo "  make redis-cli - консоль Redis"
 	@echo "  make tun     - туннель ngrok на Vite (порт 5173)"
 	@echo "  make back    - Go-бот и API Mini App (порт 2000)"
 	@echo "  make sched   - планировщик утренней рассылки"
@@ -37,6 +38,7 @@ help:
 	@echo "  make check-back  - тесты и линтер бэкенда"
 	@echo "  make check-db    - тесты адаптера Postgres, нужна make db"
 	@echo "  make check-s3    - тесты адаптера хранилища, нужна make db"
+	@echo "  make check-redis - тесты адаптера Redis, нужна make db"
 	@echo "  make check-vision - тесты и линтер сервиса своей модели"
 	@echo "  make check-gigachat - живой запрос к GigaChat, тратит токены; в make check не входит"
 	@echo "  make check-front - линтер, типы и сборка фронтенда"
@@ -55,6 +57,9 @@ vision-build:
 
 psql:
 	$(COMPOSE) exec postgres sh -c 'psql -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
+redis-cli:
+	$(COMPOSE) exec redis redis-cli
 
 migrate:
 	cd backend && go run ./cmd/migrate up
@@ -98,7 +103,7 @@ sched:
 front:
 	cd frontend && npm run dev
 
-check: check-back check-db check-s3 check-vision check-front
+check: check-back check-db check-s3 check-redis check-vision check-front
 
 check-back:
 	cd backend && go test ./... && golangci-lint run --build-tags integration
@@ -110,6 +115,10 @@ check-db:
 check-s3:
 	@test -n "$$TEST_S3_BUCKET" || { echo "нет TEST_S3_BUCKET в backend/.env: возьмите строки из backend/.env.example"; exit 1; }
 	cd backend && go test -count=1 -tags integration ./internal/adapter/s3/
+
+check-redis:
+	@test -n "$$TEST_REDIS_URL" || { echo "нет TEST_REDIS_URL в backend/.env: возьмите строку из backend/.env.example"; exit 1; }
+	cd backend && go test -count=1 -tags integration ./internal/adapter/redis/
 
 check-gigachat:
 	@test -n "$$GIGACHAT_AUTH_KEY" || { echo "нет GIGACHAT_AUTH_KEY в backend/.env"; exit 1; }

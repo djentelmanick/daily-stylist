@@ -132,7 +132,7 @@ func TestRecognize_SendsPhotoAndReadsAnswer(t *testing.T) {
 	fake := &fakeGigaChat{answer: jeansAnswer}
 	client := fake.start(t)
 
-	suggestion, err := client.Recognize(t.Context(), photo())
+	suggestion, err := client.Recognize(t.Context(), 42, photo())
 	if err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestRecognize_ForgetsPhotoAfterAnswer(t *testing.T) {
 	fake := &fakeGigaChat{answer: jeansAnswer}
 	client := fake.start(t)
 
-	if _, err := client.Recognize(t.Context(), photo()); err != nil {
+	if _, err := client.Recognize(t.Context(), 42, photo()); err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
 
@@ -181,7 +181,7 @@ func TestRecognize_ForgetsPhotoEvenWhenModelFailed(t *testing.T) {
 	fake := &fakeGigaChat{answer: jeansAnswer, chatStatus: http.StatusPaymentRequired}
 	client := fake.start(t)
 
-	if _, err := client.Recognize(t.Context(), photo()); !errors.Is(err, service.ErrRecognitionUnavailable) {
+	if _, err := client.Recognize(t.Context(), 42, photo()); !errors.Is(err, service.ErrRecognitionUnavailable) {
 		t.Errorf("ошибка = %v, ожидалась ErrRecognitionUnavailable", err)
 	}
 	if len(fake.deleted) != 1 {
@@ -194,7 +194,7 @@ func TestRecognize_AsksForTokenOnce(t *testing.T) {
 	client := fake.start(t)
 
 	for range 3 {
-		if _, err := client.Recognize(t.Context(), photo()); err != nil {
+		if _, err := client.Recognize(t.Context(), 42, photo()); err != nil {
 			t.Fatalf("Recognize: %v", err)
 		}
 	}
@@ -208,11 +208,11 @@ func TestRecognize_RenewsTokenBeforeItExpires(t *testing.T) {
 	fake := &fakeGigaChat{answer: jeansAnswer}
 	client := fake.start(t)
 
-	if _, err := client.Recognize(t.Context(), photo()); err != nil {
+	if _, err := client.Recognize(t.Context(), 42, photo()); err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
 	client.now = func() time.Time { return time.Now().Add(30 * time.Minute) }
-	if _, err := client.Recognize(t.Context(), photo()); err != nil {
+	if _, err := client.Recognize(t.Context(), 42, photo()); err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
 
@@ -225,7 +225,7 @@ func TestRecognize_UnderstandsAnswerWrappedInMarkdown(t *testing.T) {
 	fake := &fakeGigaChat{answer: "```json\n" + jeansAnswer + "\n```"}
 	client := fake.start(t)
 
-	suggestion, err := client.Recognize(t.Context(), photo())
+	suggestion, err := client.Recognize(t.Context(), 42, photo())
 	if err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
@@ -246,7 +246,7 @@ func TestRecognize_UnreadableAnswerLeavesFormEmpty(t *testing.T) {
 			fake := &fakeGigaChat{answer: answer}
 			client := fake.start(t)
 
-			suggestion, err := client.Recognize(t.Context(), photo())
+			suggestion, err := client.Recognize(t.Context(), 42, photo())
 			if err != nil {
 				t.Fatalf("Recognize: %v", err)
 			}
@@ -261,7 +261,7 @@ func TestRecognize_PassesUnknownValuesAsIs(t *testing.T) {
 	fake := &fakeGigaChat{answer: `{"category":"пиджачок","main_color":"бирюзовый"}`}
 	client := fake.start(t)
 
-	suggestion, err := client.Recognize(t.Context(), photo())
+	suggestion, err := client.Recognize(t.Context(), 42, photo())
 	if err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
@@ -283,7 +283,7 @@ func TestRecognize_ServiceGoneMeansNoSuggestion(t *testing.T) {
 		t.Fatalf("клиент: %v", err)
 	}
 
-	if _, err := client.Recognize(t.Context(), photo()); !errors.Is(err, service.ErrRecognitionUnavailable) {
+	if _, err := client.Recognize(t.Context(), 42, photo()); !errors.Is(err, service.ErrRecognitionUnavailable) {
 		t.Errorf("ошибка = %v, ожидалась ErrRecognitionUnavailable", err)
 	}
 }
@@ -299,7 +299,7 @@ func TestRecognize_RetriesAfterServerFailure(t *testing.T) {
 	fake := &fakeGigaChat{answer: jeansAnswer, tokenFailures: 2}
 	client := fake.start(t)
 
-	suggestion, err := client.Recognize(t.Context(), photo())
+	suggestion, err := client.Recognize(t.Context(), 42, photo())
 	if err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
@@ -316,7 +316,7 @@ func TestRecognize_RetriesWithWholePhotoAfterBrokenConnection(t *testing.T) {
 	fake := &fakeGigaChat{answer: jeansAnswer, uploadDrops: 1}
 	client := fake.start(t)
 
-	if _, err := client.Recognize(t.Context(), photo()); err != nil {
+	if _, err := client.Recognize(t.Context(), 42, photo()); err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
 
@@ -332,7 +332,7 @@ func TestRecognize_DoesNotRetryWhenKeyIsWrong(t *testing.T) {
 	fake := &fakeGigaChat{answer: jeansAnswer, tokenFailures: maxAttempts, tokenStatus: http.StatusUnauthorized}
 	client := fake.start(t)
 
-	if _, err := client.Recognize(t.Context(), photo()); !errors.Is(err, service.ErrRecognitionUnavailable) {
+	if _, err := client.Recognize(t.Context(), 42, photo()); !errors.Is(err, service.ErrRecognitionUnavailable) {
 		t.Errorf("ошибка = %v, ожидалась ErrRecognitionUnavailable", err)
 	}
 
@@ -345,7 +345,7 @@ func TestRecognize_GivesUpAfterThreeAttempts(t *testing.T) {
 	fake := &fakeGigaChat{answer: jeansAnswer, tokenFailures: maxAttempts}
 	client := fake.start(t)
 
-	if _, err := client.Recognize(t.Context(), photo()); !errors.Is(err, service.ErrRecognitionUnavailable) {
+	if _, err := client.Recognize(t.Context(), 42, photo()); !errors.Is(err, service.ErrRecognitionUnavailable) {
 		t.Errorf("ошибка = %v, ожидалась ErrRecognitionUnavailable", err)
 	}
 

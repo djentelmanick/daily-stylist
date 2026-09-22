@@ -21,8 +21,6 @@ func NewDeliveryRepository(pool *pgxpool.Pool) *DeliveryRepository {
 	return &DeliveryRepository{pool: pool}
 }
 
-// Время рассылки у каждого своё и считается в его поясе, поэтому местный момент
-// вычисляет база: в Go пришлось бы вычитать всех пользователей.
 const dueQuery = `
 WITH moments AS (
     SELECT locations.user_id,
@@ -64,7 +62,6 @@ func (repository *DeliveryRepository) Due(ctx context.Context, params service.Du
 	return due, nil
 }
 
-// Старые отметки убирает тот же, кто их создаёт: отдельная задача ради этого не нужна.
 // Пара дней в запасе - на случай переезда в другой пояс, когда местный день сдвигается назад.
 const keepDeliveryDays = 2
 

@@ -237,6 +237,9 @@ func TestOptions_ListsDomainValues(t *testing.T) {
 	if options.Limits.PhotoBytes != service.MaxPhotoBytes {
 		t.Errorf("лимит размера = %d, ожидался %d", options.Limits.PhotoBytes, service.MaxPhotoBytes)
 	}
+	if options.Limits.MinCityQuery != service.MinCityQueryLength {
+		t.Errorf("минимальный запрос города = %d, ожидался %d", options.Limits.MinCityQuery, service.MinCityQueryLength)
+	}
 	for _, category := range options.Categories {
 		if category.Value == string(domain.CategoryUmbrella) && category.HasWarmth {
 			t.Errorf("у зонта не должно быть уровня теплоты")

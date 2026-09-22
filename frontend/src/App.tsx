@@ -203,6 +203,7 @@ function Screens({
     case 'city':
       return (
         <CityScreen
+          minQueryLength={options.limits.min_city_query}
           onBack={back}
           onSaved={() => {
             forgetRecommendation()

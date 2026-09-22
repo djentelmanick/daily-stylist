@@ -60,7 +60,12 @@ type ItemSuggestion struct {
 }
 
 type PhotoRecognizer interface {
-	Recognize(ctx context.Context, photo PhotoContent) (ItemSuggestion, error)
+	Recognize(ctx context.Context, userID int64, photo PhotoContent) (ItemSuggestion, error)
+}
+
+type RecognitionCounter interface {
+	// Окно отсчитывается от первого распознавания, а не от полуночи.
+	Increment(ctx context.Context, userID int64, window time.Duration) (int, error)
 }
 
 type LocationRepository interface {
@@ -101,7 +106,6 @@ type DueParams struct {
 
 type DeliveryRepository interface {
 	Due(ctx context.Context, params DueParams) ([]MorningDelivery, error)
-	// Claim занимает день за отправителем, false - день уже занят.
 	Claim(ctx context.Context, delivery MorningDelivery) (bool, error)
 	Release(ctx context.Context, delivery MorningDelivery) error
 }

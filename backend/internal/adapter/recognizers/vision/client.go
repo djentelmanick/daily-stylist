@@ -45,7 +45,7 @@ func (client *Client) Close() error {
 	return client.connection.Close()
 }
 
-func (client *Client) Recognize(ctx context.Context, photo service.PhotoContent) (service.ItemSuggestion, error) {
+func (client *Client) Recognize(ctx context.Context, _ int64, photo service.PhotoContent) (service.ItemSuggestion, error) {
 	ctx, cancel := context.WithTimeout(ctx, client.timeout)
 	defer cancel()
 

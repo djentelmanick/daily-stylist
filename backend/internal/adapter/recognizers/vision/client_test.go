@@ -67,7 +67,7 @@ func TestRecognize_SendsPhotoAndReadsSuggestion(t *testing.T) {
 	}}
 	client := startService(t, recognizer)
 
-	suggestion, err := client.Recognize(t.Context(), service.PhotoContent{Bytes: []byte("jpeg"), ContentType: "image/jpeg"})
+	suggestion, err := client.Recognize(t.Context(), 42, service.PhotoContent{Bytes: []byte("jpeg"), ContentType: "image/jpeg"})
 	if err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
@@ -99,7 +99,7 @@ func TestRecognize_PassesUnknownValuesAsIs(t *testing.T) {
 		MainColor: "бирюзовый",
 	}})
 
-	suggestion, err := client.Recognize(t.Context(), service.PhotoContent{Bytes: []byte("jpeg")})
+	suggestion, err := client.Recognize(t.Context(), 42, service.PhotoContent{Bytes: []byte("jpeg")})
 	if err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
@@ -112,7 +112,7 @@ func TestRecognize_PassesUnknownValuesAsIs(t *testing.T) {
 func TestRecognize_EmptyAnswerHasNoColorsOrSeasons(t *testing.T) {
 	client := startService(t, &fakeRecognizer{response: &visionpb.RecognizeItemResponse{}})
 
-	suggestion, err := client.Recognize(t.Context(), service.PhotoContent{Bytes: []byte("jpeg")})
+	suggestion, err := client.Recognize(t.Context(), 42, service.PhotoContent{Bytes: []byte("jpeg")})
 	if err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestRecognize_EmptyAnswerHasNoColorsOrSeasons(t *testing.T) {
 func TestRecognize_FailureMeansNoSuggestion(t *testing.T) {
 	client := startService(t, &fakeRecognizer{err: status.Error(codes.Internal, "модель не загрузилась")})
 
-	_, err := client.Recognize(t.Context(), service.PhotoContent{Bytes: []byte("jpeg")})
+	_, err := client.Recognize(t.Context(), 42, service.PhotoContent{Bytes: []byte("jpeg")})
 
 	if !errors.Is(err, service.ErrRecognitionUnavailable) {
 		t.Errorf("ошибка = %v, ожидалась ErrRecognitionUnavailable", err)
@@ -148,7 +148,7 @@ func TestRecognize_UnreachableServiceMeansNoSuggestion(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = client.Close() })
 
-	if _, err := client.Recognize(t.Context(), service.PhotoContent{Bytes: []byte("jpeg")}); !errors.Is(err, service.ErrRecognitionUnavailable) {
+	if _, err := client.Recognize(t.Context(), 42, service.PhotoContent{Bytes: []byte("jpeg")}); !errors.Is(err, service.ErrRecognitionUnavailable) {
 		t.Errorf("ошибка = %v, ожидалась ErrRecognitionUnavailable", err)
 	}
 }

@@ -90,6 +90,7 @@ func TestRecognizePhoto_TellsWhyThereIsNoSuggestion(t *testing.T) {
 		code   string
 	}{
 		{"сервис распознавания недоступен", service.ErrRecognitionUnavailable, http.StatusBadGateway, "recognition_unavailable"},
+		{"лимит на сегодня исчерпан", service.ErrRecognitionLimit, http.StatusTooManyRequests, "recognition_limit"},
 		{"чужая или пропавшая фотография", service.ErrPhotoNotUploaded, http.StatusUnprocessableEntity, "photo_not_uploaded"},
 	}
 	for _, test := range tests {

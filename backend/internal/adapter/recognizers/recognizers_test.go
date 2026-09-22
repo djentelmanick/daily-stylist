@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/recognizers/gigachat"
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/recognizers/vision"
 	"github.com/djentelmanick/daily-stylist/backend/internal/config"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
@@ -21,19 +20,19 @@ func settings(primary, fallback string) config.Recognition {
 }
 
 func TestNew_OnlyPrimary(t *testing.T) {
-	recognizer, closeRecognizer, err := New(settings(config.RecognizerGigaChat, ""))
+	recognizer, closeRecognizer, err := New(settings(config.RecognizerGigaChat, ""), nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
 	defer closeRecognizer()
 
-	if _, ok := recognizer.(*gigachat.Client); !ok {
-		t.Errorf("распознаватель = %T, ожидался клиент GigaChat", recognizer)
+	if _, ok := recognizer.(*service.Limited); !ok {
+		t.Errorf("распознаватель = %T, ожидался GigaChat под суточным лимитом", recognizer)
 	}
 }
 
 func TestNew_PrimaryWithFallback(t *testing.T) {
-	recognizer, closeRecognizer, err := New(settings(config.RecognizerVision, config.RecognizerGigaChat))
+	recognizer, closeRecognizer, err := New(settings(config.RecognizerVision, config.RecognizerGigaChat), nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}
@@ -45,7 +44,7 @@ func TestNew_PrimaryWithFallback(t *testing.T) {
 }
 
 func TestNew_VisionAlone(t *testing.T) {
-	recognizer, closeRecognizer, err := New(settings(config.RecognizerVision, ""))
+	recognizer, closeRecognizer, err := New(settings(config.RecognizerVision, ""), nil)
 	if err != nil {
 		t.Fatalf("New: %v", err)
 	}

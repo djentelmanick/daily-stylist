@@ -40,6 +40,15 @@ jobs:
           --health-interval 2s
           --health-timeout 3s
           --health-retries 15
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
     steps:
       - uses: actions/checkout@v7
 
@@ -67,6 +76,7 @@ jobs:
         run: go test -count=1 -race -tags integration ./...
         env:
           TEST_DATABASE_URL: postgres://stylist:stylist@localhost:5432/stylist
+          TEST_REDIS_URL: redis://localhost:6379/1
 
   lint:
     name: golangci-lint

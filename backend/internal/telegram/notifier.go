@@ -31,7 +31,6 @@ func NewNotifier(ctx context.Context, token, miniAppURL string) (*Notifier, erro
 	return &Notifier{api: api, miniAppURL: miniAppURL}, nil
 }
 
-// В чат уходит первый вариант образа, остальные пользователь смотрит в приложении.
 func (notifier *Notifier) SendRecommendation(
 	ctx context.Context,
 	userID int64,

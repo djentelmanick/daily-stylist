@@ -34,7 +34,7 @@ func TestRecognize_TalksToRealGigaChat(t *testing.T) {
 		t.Fatalf("клиент: %v", err)
 	}
 
-	suggestion, err := client.Recognize(t.Context(), service.PhotoContent{Bytes: jpegPhoto(t), ContentType: "image/jpeg"})
+	suggestion, err := client.Recognize(t.Context(), 42, service.PhotoContent{Bytes: jpegPhoto(t), ContentType: "image/jpeg"})
 	if err != nil {
 		t.Fatalf("Recognize: %v", err)
 	}

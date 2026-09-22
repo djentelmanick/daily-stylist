@@ -115,10 +115,11 @@ type warmthLevelOption struct {
 }
 
 type textLimits struct {
-	Name        int      `json:"name"`
-	Description int      `json:"description"`
-	PhotoBytes  int64    `json:"photo_bytes"`
-	PhotoTypes  []string `json:"photo_types"`
+	Name         int      `json:"name"`
+	Description  int      `json:"description"`
+	PhotoBytes   int64    `json:"photo_bytes"`
+	PhotoTypes   []string `json:"photo_types"`
+	MinCityQuery int      `json:"min_city_query"`
 }
 
 type optionsResponse struct {
@@ -137,10 +138,11 @@ func (api *endpoints) options(writer http.ResponseWriter, request *http.Request)
 		// только на несколько часов в ночь смены сезона.
 		CurrentSeason: string(domain.SeasonAt(time.Now())),
 		Limits: textLimits{
-			Name:        domain.MaxNameLength,
-			Description: domain.MaxDescriptionLength,
-			PhotoBytes:  service.MaxPhotoBytes,
-			PhotoTypes:  service.PhotoTypes(),
+			Name:         domain.MaxNameLength,
+			Description:  domain.MaxDescriptionLength,
+			PhotoBytes:   service.MaxPhotoBytes,
+			PhotoTypes:   service.PhotoTypes(),
+			MinCityQuery: service.MinCityQueryLength,
 		},
 	}
 	for _, category := range domain.AllCategories() {
@@ -447,6 +449,8 @@ func writeFailure(writer http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrPhotoNotUploaded):
 		log.Printf("miniapp: %v", err)
 		writeError(writer, http.StatusUnprocessableEntity, "photo_not_uploaded")
+	case errors.Is(err, service.ErrRecognitionLimit):
+		writeError(writer, http.StatusTooManyRequests, "recognition_limit")
 	case errors.Is(err, service.ErrRecognitionUnavailable):
 		log.Printf("miniapp: %v", err)
 		writeError(writer, http.StatusBadGateway, "recognition_unavailable")

@@ -9,7 +9,7 @@ import (
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
 )
 
-const minCityQueryLength = 2
+const MinCityQueryLength = 2
 
 type Locations struct {
 	repository LocationRepository
@@ -23,7 +23,7 @@ func NewLocations(repository LocationRepository, cities CitySearch) *Locations {
 func (locations *Locations) SearchCities(ctx context.Context, query string) ([]domain.Location, error) {
 	query = strings.TrimSpace(query)
 	length := utf8.RuneCountInString(query)
-	if length < minCityQueryLength || length > domain.MaxLocationNameLength {
+	if length < MinCityQueryLength || length > domain.MaxLocationNameLength {
 		return nil, nil
 	}
 
