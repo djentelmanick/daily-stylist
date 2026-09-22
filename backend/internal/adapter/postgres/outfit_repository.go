@@ -40,6 +40,10 @@ FROM outfit JOIN items ON items.user_id = @user_id AND items.id = ANY(@item_ids)
 ON CONFLICT DO NOTHING`
 
 func (repository *OutfitRepository) SaveWorn(ctx context.Context, userID int64, day time.Time, itemIDs []int64) error {
+	// nil ушёл бы в базу как NULL, и старые вещи образа не удалились бы.
+	if itemIDs == nil {
+		itemIDs = []int64{}
+	}
 	_, err := repository.pool.Exec(ctx, saveWornQuery, pgx.NamedArgs{
 		"user_id":  userID,
 		"worn_on":  day,

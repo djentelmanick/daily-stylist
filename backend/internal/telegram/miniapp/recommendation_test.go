@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
+	"github.com/djentelmanick/daily-stylist/backend/internal/domain/rules"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
 )
 
@@ -85,7 +86,54 @@ func TestWearToday(t *testing.T) {
 	}
 
 	response = serve(handler, newRequest(http.MethodPut, "/api/outfits/today", `{"item_ids":[]}`, initData))
+	if response.Code != http.StatusNoContent || recommender.wornIDs == nil || len(recommender.wornIDs) != 0 {
+		t.Errorf("пустой образ: status = %d, записаны %v", response.Code, recommender.wornIDs)
+	}
+
+	response = serve(handler, newRequest(http.MethodPut, "/api/outfits/today", `{}`, initData))
 	checkError(t, response, http.StatusBadRequest, "bad_request")
+}
+
+func TestCandidates(t *testing.T) {
+	recommender := &stubRecommender{candidates: []rules.Candidate{
+		{Item: domain.Item{ID: 9}, Notes: []domain.Note{{Kind: domain.NoteWornRecently, DaysAgo: 1}}},
+		{Item: domain.Item{ID: 4}},
+	}}
+	handler := NewHandler(testBotToken, failingWardrobe{}, recommender, service.NewLocations(&memoryLocations{}, stubCities{}), nil, &stubPhotos{}, &stubRecognition{})
+	initData := signedInitData(testBotToken, 42, time.Now())
+
+	response := serve(handler, newRequest(http.MethodGet, "/api/outfits/candidates?items=3,5&replace=5", "", initData))
+	want := `{"candidates":[{"item_id":9,"notes":["Надевали вчера"]},{"item_id":4,"notes":[]}]}`
+	if got := strings.TrimSpace(response.Body.String()); got != want {
+		t.Errorf("тело = %s, ожидалось %s", got, want)
+	}
+	if !slices.Equal(recommender.outfitIDs, []int64{3, 5}) || recommender.replaceID != 5 {
+		t.Errorf("спросили образ %v, замена %d", recommender.outfitIDs, recommender.replaceID)
+	}
+
+	response = serve(handler, newRequest(http.MethodGet, "/api/outfits/candidates", "", initData))
+	if response.Code != http.StatusOK || len(recommender.outfitIDs) != 0 || recommender.replaceID != 0 {
+		t.Errorf("пустой образ без замены: status = %d, образ %v, замена %d", response.Code, recommender.outfitIDs, recommender.replaceID)
+	}
+
+	for _, query := range []string{"items=1,x", "items=0", "replace=-1", "items=1,,2"} {
+		response = serve(handler, newRequest(http.MethodGet, "/api/outfits/candidates?"+query, "", initData))
+		checkError(t, response, http.StatusBadRequest, "bad_request")
+	}
+}
+
+func TestReview(t *testing.T) {
+	recommender := &stubRecommender{notes: []domain.Note{{Kind: domain.NoteMissing, Category: domain.CategoryShoes}}}
+	handler := NewHandler(testBotToken, failingWardrobe{}, recommender, service.NewLocations(&memoryLocations{}, stubCities{}), nil, &stubPhotos{}, &stubRecognition{})
+
+	response := serve(handler, newRequest(http.MethodGet, "/api/outfits/review?items=2", "", signedInitData(testBotToken, 42, time.Now())))
+
+	if got := strings.TrimSpace(response.Body.String()); got != `{"notes":["Нет доступной вещи в категории «Обувь»"]}` {
+		t.Errorf("тело = %s", got)
+	}
+	if !slices.Equal(recommender.outfitIDs, []int64{2}) {
+		t.Errorf("разобран образ %v", recommender.outfitIDs)
+	}
 }
 
 func TestTodayOutfit(t *testing.T) {
@@ -154,6 +202,10 @@ type stubRecommender struct {
 	err            error
 	wornBy         int64
 	wornIDs        []int64
+	candidates     []rules.Candidate
+	notes          []domain.Note
+	outfitIDs      []int64
+	replaceID      int64
 }
 
 func (recommender *stubRecommender) Recommend(context.Context, int64) (service.Recommendation, error) {
@@ -167,6 +219,16 @@ func (recommender *stubRecommender) TodayOutfit(context.Context, int64) ([]domai
 func (recommender *stubRecommender) WearToday(_ context.Context, userID int64, itemIDs []int64) error {
 	recommender.wornBy, recommender.wornIDs = userID, itemIDs
 	return recommender.err
+}
+
+func (recommender *stubRecommender) Candidates(_ context.Context, _ int64, outfitIDs []int64, replaceID int64) ([]rules.Candidate, error) {
+	recommender.outfitIDs, recommender.replaceID = outfitIDs, replaceID
+	return recommender.candidates, recommender.err
+}
+
+func (recommender *stubRecommender) Review(_ context.Context, _ int64, itemIDs []int64) ([]domain.Note, error) {
+	recommender.outfitIDs = itemIDs
+	return recommender.notes, recommender.err
 }
 
 type stubCities struct {

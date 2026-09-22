@@ -230,27 +230,6 @@ func (recommender recommender) historyPenalty(item domain.Item) int {
 func (recommender recommender) outfit(look look) domain.Outfit {
 	conditions, wardrobe := recommender.conditions, recommender.wardrobe
 	items := look.items()
-	withOuterwear := look.outerwear != nil
-	var notes []domain.Note
-
-	for _, item := range items {
-		ideal := conditions.idealLevel(item, withOuterwear)
-		switch {
-		case item.WarmthLevel < ideal-1:
-			notes = append(notes, domain.Note{Kind: domain.NoteTooLight, Item: item})
-		case item.WarmthLevel > ideal+1:
-			notes = append(notes, domain.Note{Kind: domain.NoteTooWarm, Item: item})
-		}
-	}
-	if conditions.needOuterwear && !withOuterwear {
-		notes = append(notes, domain.Note{Kind: domain.NoteMissing, Category: domain.CategoryOuterwear})
-	}
-	if look.shoes == nil {
-		notes = append(notes, domain.Note{Kind: domain.NoteMissing, Category: domain.CategoryShoes})
-	}
-	if conditions.needOuterwear && withOuterwear && conditions.warmsUp {
-		notes = append(notes, domain.Note{Kind: domain.NoteWarmsUp})
-	}
 
 	colors := mainColors(items)
 	add := func(candidates []domain.Item, ideal domain.WarmthLevel) bool {
@@ -270,29 +249,25 @@ func (recommender recommender) outfit(look look) domain.Outfit {
 		add(near(wardrobe[domain.CategorySocks], level), level)
 	}
 	if level >= domain.WarmthLevelHeavy {
-		if !add(near(wardrobe[domain.CategoryHat], level), level) {
-			notes = append(notes, domain.Note{Kind: domain.NoteMissing, Category: domain.CategoryHat})
-		}
+		add(near(wardrobe[domain.CategoryHat], level), level)
 		add(near(wardrobe[domain.CategoryScarf], level), level)
 	} else if conditions.uvIndex >= StrongUVIndex && !conditions.precipitation {
 		add(near(wardrobe[domain.CategoryHat], domain.WarmthLevelLight), domain.WarmthLevelLight)
 	}
 
-	umbrella := false
 	if look.rain == rainUmbrella {
-		umbrella = add(wardrobe[domain.CategoryUmbrella], level)
-	} else if conditions.rain() && conditions.windy && len(wardrobe[domain.CategoryUmbrella]) > 0 {
-		notes = append(notes, domain.Note{Kind: domain.NoteTooWindyForUmbrella})
-	}
-	raincoat := withOuterwear && look.outerwear.Waterproof
-	if conditions.rain() && !umbrella && !raincoat {
-		notes = append(notes, domain.Note{Kind: domain.NoteNoRainProtection})
+		add(wardrobe[domain.CategoryUmbrella], level)
 	}
 	if conditions.sunny() {
 		add(wardrobe[domain.CategorySunglasses], level)
 	}
 	add(wardrobe[domain.CategoryBag], level)
 
+	notes := conditions.review(items)
+	// Зонт в ветер в образ не попадает, но о причине стоит сказать.
+	if conditions.rain() && conditions.windy && len(wardrobe[domain.CategoryUmbrella]) > 0 {
+		notes = append(notes, domain.Note{Kind: domain.NoteTooWindyForUmbrella})
+	}
 	domain.SortForWearing(items)
 	return domain.Outfit{Items: items, Notes: notes}
 }

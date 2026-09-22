@@ -205,6 +205,27 @@ export function wearToday(itemIds: number[]): Promise<void> {
   return request<void>('PUT', '/api/outfits/today', { item_ids: itemIds })
 }
 
+export type Candidate = {
+  item_id: number
+  notes: string[]
+}
+
+// replace = null - что добавить в образ, иначе - чем заменить эту вещь.
+export async function fetchCandidates(outfit: number[], replace: number | null): Promise<Candidate[]> {
+  const query = new URLSearchParams({ items: outfit.join(',') })
+  if (replace !== null) {
+    query.set('replace', String(replace))
+  }
+  const body = await request<{ candidates: Candidate[] }>('GET', `/api/outfits/candidates?${query}`)
+  return body.candidates
+}
+
+export async function reviewOutfit(itemIds: number[]): Promise<string[]> {
+  const query = new URLSearchParams({ items: itemIds.join(',') })
+  const body = await request<{ notes: string[] }>('GET', `/api/outfits/review?${query}`)
+  return body.notes
+}
+
 export async function searchCities(query: string): Promise<City[]> {
   const body = await request<{ cities: City[] }>('GET', `/api/cities?${new URLSearchParams({ query })}`)
   return body.cities

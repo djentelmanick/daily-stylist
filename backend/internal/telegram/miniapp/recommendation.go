@@ -2,6 +2,8 @@ package miniapp
 
 import (
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
 	"github.com/djentelmanick/daily-stylist/backend/internal/telegram/texts"
@@ -88,7 +90,7 @@ func (api *endpoints) wearToday(writer http.ResponseWriter, request *http.Reques
 	if !decodeBody(writer, request, &body) {
 		return
 	}
-	if len(body.ItemIDs) == 0 || len(body.ItemIDs) > maxOutfitItems {
+	if body.ItemIDs == nil || len(body.ItemIDs) > maxOutfitItems {
 		writeError(writer, http.StatusBadRequest, "bad_request")
 		return
 	}
@@ -98,6 +100,84 @@ func (api *endpoints) wearToday(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 	writer.WriteHeader(http.StatusNoContent)
+}
+
+type candidateResponse struct {
+	ItemID int64    `json:"item_id"`
+	Notes  []string `json:"notes"`
+}
+
+type candidatesResponse struct {
+	Candidates []candidateResponse `json:"candidates"`
+}
+
+func (api *endpoints) candidates(writer http.ResponseWriter, request *http.Request) {
+	query := request.URL.Query()
+	outfitIDs, ok := parseIDs(query.Get("items"))
+	var replaceID int64
+	if value := query.Get("replace"); ok && value != "" {
+		id, err := strconv.ParseInt(value, 10, 64)
+		ok = err == nil && id > 0
+		replaceID = id
+	}
+	if !ok {
+		writeError(writer, http.StatusBadRequest, "bad_request")
+		return
+	}
+
+	candidates, err := api.recommender.Candidates(request.Context(), userIDFrom(request.Context()), outfitIDs, replaceID)
+	if err != nil {
+		writeFailure(writer, err)
+		return
+	}
+
+	response := candidatesResponse{Candidates: make([]candidateResponse, len(candidates))}
+	for index, candidate := range candidates {
+		notes := make([]string, len(candidate.Notes))
+		for noteIndex, note := range candidate.Notes {
+			notes[noteIndex] = texts.CandidateNote(note)
+		}
+		response.Candidates[index] = candidateResponse{ItemID: candidate.Item.ID, Notes: notes}
+	}
+	writeJSON(writer, http.StatusOK, response)
+}
+
+type reviewResponse struct {
+	Notes []string `json:"notes"`
+}
+
+func (api *endpoints) review(writer http.ResponseWriter, request *http.Request) {
+	itemIDs, ok := parseIDs(request.URL.Query().Get("items"))
+	if !ok {
+		writeError(writer, http.StatusBadRequest, "bad_request")
+		return
+	}
+
+	notes, err := api.recommender.Review(request.Context(), userIDFrom(request.Context()), itemIDs)
+	if err != nil {
+		writeFailure(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, reviewResponse{Notes: noteTexts(notes)})
+}
+
+func parseIDs(value string) ([]int64, bool) {
+	if value == "" {
+		return []int64{}, true
+	}
+	parts := strings.Split(value, ",")
+	if len(parts) > maxOutfitItems {
+		return nil, false
+	}
+	ids := make([]int64, len(parts))
+	for index, part := range parts {
+		id, err := strconv.ParseInt(part, 10, 64)
+		if err != nil || id <= 0 {
+			return nil, false
+		}
+		ids[index] = id
+	}
+	return ids, true
 }
 
 type citiesResponse struct {

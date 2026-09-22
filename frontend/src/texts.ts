@@ -15,6 +15,8 @@ export const texts = {
   recommendation: 'Подобрать образ',
   recommendationHint: 'Из вашего гардероба по погоде',
   todayOutfit: 'Сегодня на вас',
+  todayOutfitEmpty: 'Образ на сегодня не записан',
+  assembleOutfit: 'Собрать',
 
   pickingOutfit: 'Смотрю погоду и подбираю образ',
   cityNeeded: 'Чтобы подобрать образ по погоде, выберите город.',
@@ -26,6 +28,18 @@ export const texts = {
   wear: 'Надеваю',
   worn: 'Надето',
   wornHint: 'Записал. В ближайшие дни постараюсь не повторять эту одежду.',
+  replaceItem: 'Заменить',
+  removeItem: 'Убрать',
+
+  todayTitle: 'Образ на сегодня',
+  todayEmpty: 'Пока ничего не выбрано. Добавьте вещи, которые надели.',
+  addToOutfit: 'Добавить вещь',
+  replaceTitle: (name: string) => `Вместо «${name}»`,
+  pickHint: 'Сначала то, что лучше подходит по погоде',
+  searchPlaceholder: 'Поиск по названию',
+  searchingCandidates: 'Подбираю варианты',
+  nothingToPick: 'Больше предложить нечего.',
+  nothingFound: 'Ничего не нашлось.',
 
   settings: 'Настройки',
   settingsTitle: 'Настройки',

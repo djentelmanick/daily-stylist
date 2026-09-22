@@ -21,12 +21,17 @@ const (
 	NoteWarmsUp             NoteKind = "warms_up"
 	NoteNoRainProtection    NoteKind = "no_rain_protection"
 	NoteTooWindyForUmbrella NoteKind = "too_windy_for_umbrella"
+
+	NoteOutOfSeason   NoteKind = "out_of_season"
+	NoteWornRecently  NoteKind = "worn_recently"
+	NoteNotWaterproof NoteKind = "not_waterproof"
 )
 
 type Note struct {
 	Kind     NoteKind
 	Category Category
 	Item     Item
+	DaysAgo  int
 }
 
 func SortForWearing(items []Item) {

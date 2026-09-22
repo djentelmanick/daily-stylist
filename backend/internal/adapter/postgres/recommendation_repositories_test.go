@@ -76,6 +76,10 @@ func TestOutfitRepository_History(t *testing.T) {
 	}
 	checkLastWorn(t, outfits, 1, monday, wednesday, map[int64]time.Time{shirt.ID: monday, jeans.ID: monday})
 	checkWornOn(t, outfits, 1, tuesday)
+
+	save(monday)
+	checkWornOn(t, outfits, 1, monday)
+	checkLastWorn(t, outfits, 1, monday, wednesday, map[int64]time.Time{})
 }
 
 func checkWornOn(t *testing.T, outfits *postgres.OutfitRepository, userID int64, day time.Time, wantIDs ...int64) {

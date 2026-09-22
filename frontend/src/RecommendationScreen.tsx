@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { ApiError, fetchRecommendation, labelOf, wearToday, type Options, type Recommendation } from './api'
 import { useBackButton } from './telegram'
 import { errorText, texts } from './texts'
-import { Chevron, Dots, ItemMark, Thinking } from './ui'
+import { Chevron, Dots, Icon, ItemMark, Notes, swapIcon, Thinking } from './ui'
 
 export type RecommendationMemory = {
   recommendation: Recommendation | null
@@ -22,6 +22,7 @@ export function RecommendationScreen({
   onWorn,
   onBack,
   onOpenItem,
+  onReplaceItem,
   onChooseCity,
   onAddItem,
 }: {
@@ -31,6 +32,7 @@ export function RecommendationScreen({
   onWorn: (itemIds: number[]) => void
   onBack: () => void
   onOpenItem: (itemId: number) => void
+  onReplaceItem: (itemId: number, outfit: number[]) => void
   onChooseCity: () => void
   onAddItem: () => void
 }) {
@@ -92,6 +94,7 @@ export function RecommendationScreen({
           wornItemIds={wornItemIds}
           onWorn={onWorn}
           onOpenItem={onOpenItem}
+          onReplaceItem={onReplaceItem}
           onChooseCity={onChooseCity}
           onAddItem={onAddItem}
         />
@@ -106,6 +109,7 @@ function RecommendationView({
   wornItemIds,
   onWorn,
   onOpenItem,
+  onReplaceItem,
   onChooseCity,
   onAddItem,
 }: {
@@ -115,6 +119,7 @@ function RecommendationView({
   wornItemIds: number[]
   onWorn: (itemIds: number[]) => void
   onOpenItem: (itemId: number) => void
+  onReplaceItem: (itemId: number, outfit: number[]) => void
   onChooseCity: () => void
   onAddItem: () => void
 }) {
@@ -201,13 +206,27 @@ function RecommendationView({
             )}
             <ul className="item-list">
               {outfit.items.map((item) => (
-                <li key={item.id}>
+                <li key={item.id} className="item-row-actions">
                   <button type="button" className="item-row" onClick={() => onOpenItem(item.id)}>
                     <ItemMark item={item} />
                     <span className="item-row-text">
                       <span className="item-row-name">{item.name}</span>
                       <span className="hint">{labelOf(options.categories, item.category)}</span>
                     </span>
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label={texts.replaceItem}
+                    disabled={saving}
+                    onClick={() =>
+                      onReplaceItem(
+                        item.id,
+                        outfit.items.map((one) => one.id),
+                      )
+                    }
+                  >
+                    <Icon path={swapIcon} />
                   </button>
                 </li>
               ))}
@@ -241,17 +260,4 @@ function RecommendationView({
 
 function sameItems(itemIds: number[], otherIds: number[]): boolean {
   return itemIds.length === otherIds.length && itemIds.every((itemId) => otherIds.includes(itemId))
-}
-
-function Notes({ notes }: { notes: string[] }) {
-  if (notes.length === 0) {
-    return null
-  }
-  return (
-    <ul className="notes">
-      {notes.map((note) => (
-        <li key={note}>{note}</li>
-      ))}
-    </ul>
-  )
 }

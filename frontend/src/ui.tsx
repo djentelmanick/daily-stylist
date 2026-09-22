@@ -78,3 +78,36 @@ export function Chevron({ direction }: { direction: 'left' | 'right' }) {
     </svg>
   )
 }
+
+export function Icon({ path }: { path: string }) {
+  return (
+    <svg
+      className="icon"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d={path} />
+    </svg>
+  )
+}
+
+export const swapIcon = 'M7 4L3 8l4 4M3 8h14M17 12l4 4-4 4M21 16H7'
+export const removeIcon = 'M6 6l12 12M18 6L6 18'
+
+export function Notes({ notes }: { notes: string[] }) {
+  if (notes.length === 0) {
+    return null
+  }
+  return (
+    <ul className="notes">
+      {notes.map((note) => (
+        <li key={note}>{note}</li>
+      ))}
+    </ul>
+  )
+}

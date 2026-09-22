@@ -54,8 +54,40 @@ func Note(note domain.Note) string {
 		return "Обещают дождь, а зонта и непромокаемой верхней одежды нет"
 	case domain.NoteTooWindyForUmbrella:
 		return "Сильный ветер: зонт не спасёт, лучше непромокаемая куртка"
+	case domain.NoteNotWaterproof, domain.NoteOutOfSeason, domain.NoteWornRecently:
+		return CandidateNote(note)
 	default:
 		return string(note.Kind)
+	}
+}
+
+func CandidateNote(note domain.Note) string {
+	switch note.Kind {
+	case domain.NoteTooLight:
+		return "Легче, чем нужно по погоде"
+	case domain.NoteTooWarm:
+		return "Теплее, чем нужно по погоде"
+	case domain.NoteNotWaterproof:
+		return "Промокнет в дождь"
+	case domain.NoteOutOfSeason:
+		return "Не по сезону"
+	case domain.NoteWornRecently:
+		return wornDaysAgo(note.DaysAgo)
+	default:
+		return Note(note)
+	}
+}
+
+func wornDaysAgo(days int) string {
+	switch {
+	case days == 1:
+		return "Надевали вчера"
+	case days == 2:
+		return "Надевали позавчера"
+	case days%10 >= 2 && days%10 <= 4 && (days%100 < 12 || days%100 > 14):
+		return fmt.Sprintf("Надевали %d дня назад", days)
+	default:
+		return fmt.Sprintf("Надевали %d дней назад", days)
 	}
 }
 

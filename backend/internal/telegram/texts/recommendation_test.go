@@ -71,3 +71,16 @@ func TestMorning(t *testing.T) {
 		t.Errorf("вещи не в порядке надевания:\n%s", message)
 	}
 }
+
+func TestCandidateNote_WornDaysAgo(t *testing.T) {
+	for days, want := range map[int]string{
+		1: "Надевали вчера",
+		2: "Надевали позавчера",
+		3: "Надевали 3 дня назад",
+		5: "Надевали 5 дней назад",
+	} {
+		if got := texts.CandidateNote(domain.Note{Kind: domain.NoteWornRecently, DaysAgo: days}); got != want {
+			t.Errorf("%d дн.: %q, ожидалось %q", days, got, want)
+		}
+	}
+}

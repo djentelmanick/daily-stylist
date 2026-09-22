@@ -1,11 +1,12 @@
 import type { Item } from './api'
 import { items, texts } from './texts'
-import { Chevron, ItemAvatar } from './ui'
+import { Chevron, Icon, ItemAvatar } from './ui'
 
 export function HomeScreen({
   itemCount,
   todayItems,
   onOpenItem,
+  onOpenToday,
   onOpenWardrobe,
   onAddItem,
   onRecommend,
@@ -14,6 +15,7 @@ export function HomeScreen({
   itemCount: number
   todayItems: Item[]
   onOpenItem: (itemId: number) => void
+  onOpenToday: () => void
   onOpenWardrobe: () => void
   onAddItem: () => void
   onRecommend: () => void
@@ -33,9 +35,24 @@ export function HomeScreen({
         </button>
       </header>
 
+      {todayItems.length === 0 && itemCount > 0 && (
+        <section className="today-card">
+          <div className="card-row">
+            <p className="hint">{texts.todayOutfitEmpty}</p>
+            <button type="button" className="link-button" onClick={onOpenToday}>
+              {texts.assembleOutfit}
+            </button>
+          </div>
+        </section>
+      )}
       {todayItems.length > 0 && (
         <section className="today-card">
-          <p className="hint">{texts.todayOutfit}</p>
+          <div className="card-row">
+            <p className="hint">{texts.todayOutfit}</p>
+            <button type="button" className="link-button" onClick={onOpenToday}>
+              {texts.edit}
+            </button>
+          </div>
           <ul className="today-items">
             {todayItems.map((item) => (
               <li key={item.id}>
@@ -91,21 +108,4 @@ const icons = {
   plus: 'M12 5v14M5 12h14',
   gear:
     'M12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7zM19.4 13.4a7.7 7.7 0 0 0 0-2.8l2-1.4-2-3.4-2.3 1a7.7 7.7 0 0 0-2.4-1.4L14.4 3h-4l-.3 2.4a7.7 7.7 0 0 0-2.4 1.4l-2.3-1-2 3.4 2 1.4a7.7 7.7 0 0 0 0 2.8l-2 1.4 2 3.4 2.3-1a7.7 7.7 0 0 0 2.4 1.4l.3 2.4h4l.3-2.4a7.7 7.7 0 0 0 2.4-1.4l2.3 1 2-3.4z',
-}
-
-function Icon({ path }: { path: string }) {
-  return (
-    <svg
-      className="icon"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d={path} />
-    </svg>
-  )
 }

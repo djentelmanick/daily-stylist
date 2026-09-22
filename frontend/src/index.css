@@ -261,6 +261,26 @@ h1 {
   -webkit-touch-callout: none;
 }
 
+.item-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 8px;
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.item-row-actions .item-row {
+  flex: 1;
+  min-width: 0;
+  background: none;
+}
+
+.item-row-actions .icon-button {
+  flex-shrink: 0;
+  background: none;
+}
+
 .item-row-checked {
   outline: 2px solid var(--accent);
 }

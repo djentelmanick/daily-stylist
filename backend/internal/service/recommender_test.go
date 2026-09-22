@@ -84,6 +84,50 @@ func TestRecommender_WearTodaySavesLocalDate(t *testing.T) {
 	}
 }
 
+func TestRecommender_WearTodayWithNothingClearsOutfit(t *testing.T) {
+	outfits := &fakeOutfits{}
+	recommender := service.NewRecommender(fakeItems{}, outfits, fakeLocations{location: vladivostok}, &fakeForecaster{}, fixedNow)
+
+	if err := recommender.WearToday(t.Context(), 42, []int64{}); err != nil {
+		t.Fatalf("WearToday: %v", err)
+	}
+
+	if outfits.savedIDs == nil || len(outfits.savedIDs) != 0 {
+		t.Errorf("записаны %v, ожидался пустой образ", outfits.savedIDs)
+	}
+}
+
+func TestRecommender_Candidates(t *testing.T) {
+	items := fakeItems{items: []domain.Item{
+		testItem(1, "Футболка", domain.CategoryTop),
+		testItem(2, "Рубашка", domain.CategoryTop),
+		testItem(3, "Шорты", domain.CategoryBottom),
+		testItem(4, "Кеды", domain.CategoryShoes),
+	}}
+	forecaster := &fakeForecaster{weather: domain.Weather{FeelsLikeMin: 25, FeelsLikeMax: 25}}
+	recommender := service.NewRecommender(items, &fakeOutfits{}, fakeLocations{location: vladivostok}, forecaster, fixedNow)
+
+	replacements, err := recommender.Candidates(t.Context(), 42, []int64{1, 3}, 1)
+	if err != nil {
+		t.Fatalf("Candidates: %v", err)
+	}
+	if len(replacements) != 1 || replacements[0].Item.ID != 2 {
+		t.Errorf("замены = %+v, ожидалась только рубашка", replacements)
+	}
+
+	additions, err := recommender.Candidates(t.Context(), 42, []int64{1, 3}, 0)
+	if err != nil {
+		t.Fatalf("Candidates: %v", err)
+	}
+	if len(additions) != 2 {
+		t.Errorf("добавления = %+v, ожидались рубашка и кеды", additions)
+	}
+
+	if _, err := recommender.Candidates(t.Context(), 42, []int64{1, 3}, 4); !errors.Is(err, service.ErrItemNotFound) {
+		t.Errorf("замена вещи не из образа: err = %v, ожидалась ErrItemNotFound", err)
+	}
+}
+
 func TestRecommender_TodayOutfit(t *testing.T) {
 	outfits := &fakeOutfits{worn: []domain.Item{
 		testItem(3, "Кеды", domain.CategoryShoes),
@@ -179,6 +223,7 @@ type fakeOutfits struct {
 	lastWorn map[int64]time.Time
 	from, to time.Time
 	savedDay time.Time
+	savedIDs []int64
 	worn     []domain.Item
 	wornDay  time.Time
 }
@@ -188,8 +233,8 @@ func (outfits *fakeOutfits) WornOn(_ context.Context, _ int64, day time.Time) ([
 	return outfits.worn, nil
 }
 
-func (outfits *fakeOutfits) SaveWorn(_ context.Context, _ int64, day time.Time, _ []int64) error {
-	outfits.savedDay = day
+func (outfits *fakeOutfits) SaveWorn(_ context.Context, _ int64, day time.Time, itemIDs []int64) error {
+	outfits.savedDay, outfits.savedIDs = day, itemIDs
 	return nil
 }
 

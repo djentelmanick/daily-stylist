@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
+	"github.com/djentelmanick/daily-stylist/backend/internal/domain/rules"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
 	"github.com/djentelmanick/daily-stylist/backend/internal/telegram/texts"
 )
@@ -28,6 +29,8 @@ type recommender interface {
 	Recommend(ctx context.Context, userID int64) (service.Recommendation, error)
 	TodayOutfit(ctx context.Context, userID int64) ([]domain.Item, error)
 	WearToday(ctx context.Context, userID int64, itemIDs []int64) error
+	Candidates(ctx context.Context, userID int64, outfitIDs []int64, replaceID int64) ([]rules.Candidate, error)
+	Review(ctx context.Context, userID int64, itemIDs []int64) ([]domain.Note, error)
 }
 
 type photos interface {
@@ -90,6 +93,8 @@ func NewHandler(
 	mux.HandleFunc("GET /api/recommendation", api.recommend)
 	mux.HandleFunc("GET /api/outfits/today", api.todayOutfit)
 	mux.HandleFunc("PUT /api/outfits/today", api.wearToday)
+	mux.HandleFunc("GET /api/outfits/candidates", api.candidates)
+	mux.HandleFunc("GET /api/outfits/review", api.review)
 	mux.HandleFunc("GET /api/cities", api.searchCities)
 	mux.HandleFunc("PUT /api/city", api.setCity)
 	mux.HandleFunc("GET /api/settings", api.getSettings)

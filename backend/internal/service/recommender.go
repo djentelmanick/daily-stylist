@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
@@ -37,47 +38,103 @@ func NewRecommender(
 	return &Recommender{items: items, outfits: outfits, locations: locations, forecaster: forecaster, now: now}
 }
 
-func (recommender *Recommender) Recommend(ctx context.Context, userID int64) (recommendation Recommendation, err error) {
-	defer func() {
-		if err != nil {
-			err = fmt.Errorf("подбор образа: %w", err)
-		}
-	}()
+func (recommender *Recommender) Recommend(ctx context.Context, userID int64) (Recommendation, error) {
+	situation, err := recommender.situation(ctx, userID)
+	if err != nil {
+		return Recommendation{}, fmt.Errorf("подбор образа: %w", err)
+	}
+	outfits, notes := rules.Recommend(situation.input)
+	return Recommendation{
+		Location: situation.location,
+		Weather:  situation.input.Weather,
+		Outfits:  outfits,
+		Notes:    notes,
+	}, nil
+}
 
+// Candidates - чем заменить вещь replaceID в образе, а при replaceID = 0 - что в него добавить.
+func (recommender *Recommender) Candidates(
+	ctx context.Context,
+	userID int64,
+	outfitIDs []int64,
+	replaceID int64,
+) ([]rules.Candidate, error) {
+	situation, err := recommender.situation(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("варианты замены: %w", err)
+	}
+
+	outfit := chosen(situation.input.Items, outfitIDs)
+	if replaceID == 0 {
+		return rules.Additions(situation.input, outfit), nil
+	}
+	index := slices.IndexFunc(outfit, func(item domain.Item) bool { return item.ID == replaceID })
+	if index < 0 {
+		return nil, fmt.Errorf("варианты замены: %w", ErrItemNotFound)
+	}
+	return rules.Replacements(situation.input, outfit, outfit[index]), nil
+}
+
+func (recommender *Recommender) Review(ctx context.Context, userID int64, itemIDs []int64) ([]domain.Note, error) {
+	situation, err := recommender.situation(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("разбор образа: %w", err)
+	}
+	return rules.Review(situation.input.Weather, chosen(situation.input.Items, itemIDs)), nil
+}
+
+type situation struct {
+	location domain.Location
+	input    rules.Input
+}
+
+func (recommender *Recommender) situation(ctx context.Context, userID int64) (situation, error) {
 	location, err := recommender.locations.Get(ctx, userID)
 	if err != nil {
-		return Recommendation{}, err
+		return situation{}, err
 	}
 	now := recommender.now().In(location.Zone())
 
 	from, to := domain.ForecastWindow(now)
 	weather, err := recommender.forecaster.Forecast(ctx, location, from, to)
 	if err != nil {
-		return Recommendation{}, fmt.Errorf("%w: %w", ErrWeatherUnavailable, err)
+		return situation{}, fmt.Errorf("%w: %w", ErrWeatherUnavailable, err)
 	}
 
 	items, err := recommender.items.ListByUser(ctx, userID)
 	if err != nil {
-		return Recommendation{}, err
+		return situation{}, err
 	}
 
 	today := domain.DateOf(now)
 	lastWorn, err := recommender.outfits.LastWorn(ctx, userID, today.AddDate(0, 0, -rules.HistoryDays), today)
 	if err != nil {
-		return Recommendation{}, err
+		return situation{}, err
 	}
 	wornDaysAgo := make(map[int64]int, len(lastWorn))
 	for itemID, day := range lastWorn {
 		wornDaysAgo[itemID] = int(today.Sub(day).Hours() / 24)
 	}
 
-	outfits, notes := rules.Recommend(rules.Input{
-		Items:       items,
-		Weather:     weather,
-		Season:      domain.SeasonAt(now),
-		WornDaysAgo: wornDaysAgo,
-	})
-	return Recommendation{Location: location, Weather: weather, Outfits: outfits, Notes: notes}, nil
+	return situation{
+		location: location,
+		input: rules.Input{
+			Items:       items,
+			Weather:     weather,
+			Season:      domain.SeasonAt(now),
+			WornDaysAgo: wornDaysAgo,
+		},
+	}, nil
+}
+
+func chosen(items []domain.Item, itemIDs []int64) []domain.Item {
+	var result []domain.Item
+	for _, item := range items {
+		if slices.Contains(itemIDs, item.ID) {
+			result = append(result, item)
+		}
+	}
+	return result
 }
 
 func (recommender *Recommender) TodayOutfit(ctx context.Context, userID int64) ([]domain.Item, error) {
@@ -99,9 +156,6 @@ func (recommender *Recommender) TodayOutfit(ctx context.Context, userID int64) (
 }
 
 func (recommender *Recommender) WearToday(ctx context.Context, userID int64, itemIDs []int64) error {
-	if len(itemIDs) == 0 {
-		return nil
-	}
 	location, err := recommender.locations.Get(ctx, userID)
 	if err != nil {
 		return fmt.Errorf("запись образа: %w", err)
