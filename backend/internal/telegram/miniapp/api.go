@@ -44,6 +44,7 @@ type recognition interface {
 
 type locations interface {
 	SearchCities(ctx context.Context, query string) ([]domain.Location, error)
+	CityAt(ctx context.Context, latitude, longitude float64) (domain.Location, error)
 	SetLocation(ctx context.Context, userID int64, location domain.Location) error
 	City(ctx context.Context, userID int64) (domain.Location, error)
 }
@@ -96,6 +97,7 @@ func NewHandler(
 	mux.HandleFunc("GET /api/outfits/candidates", api.candidates)
 	mux.HandleFunc("GET /api/outfits/review", api.review)
 	mux.HandleFunc("GET /api/cities", api.searchCities)
+	mux.HandleFunc("GET /api/cities/at", api.cityAt)
 	mux.HandleFunc("PUT /api/city", api.setCity)
 	mux.HandleFunc("GET /api/settings", api.getSettings)
 	mux.HandleFunc("PUT /api/settings", api.saveSettings)
@@ -440,6 +442,8 @@ func writeFailure(writer http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrInvalidLocation):
 		log.Printf("miniapp: %v", err)
 		writeError(writer, http.StatusUnprocessableEntity, "invalid_location")
+	case errors.Is(err, service.ErrPlaceNotFound):
+		writeError(writer, http.StatusNotFound, "place_not_found")
 	case errors.Is(err, service.ErrLocationNotSet):
 		writeError(writer, http.StatusConflict, "location_not_set")
 	case errors.Is(err, domain.ErrInvalidSettings):

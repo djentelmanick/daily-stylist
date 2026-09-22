@@ -16,6 +16,15 @@ type TelegramWebApp = {
   HapticFeedback: {
     impactOccurred: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void
   }
+  LocationManager: {
+    isInited: boolean
+    isLocationAvailable: boolean
+    isAccessRequested: boolean
+    isAccessGranted: boolean
+    init: (callback: () => void) => void
+    getLocation: (callback: (location: Position | null) => void) => void
+    openSettings: () => void
+  }
 }
 
 declare global {
@@ -87,4 +96,73 @@ export function vibrate(): void {
   if (webApp?.isVersionAtLeast('6.1')) {
     webApp.HapticFeedback.impactOccurred('medium')
   }
+}
+
+export type Position = {
+  latitude: number
+  longitude: number
+}
+
+export class PositionError extends Error {
+  readonly denied: boolean
+
+  constructor(denied: boolean) {
+    super(denied ? 'denied' : 'unavailable')
+    this.denied = denied
+  }
+}
+
+// Сначала геопозиция Telegram: браузерная внутри Telegram на части клиентов не работает.
+export function getPosition(): Promise<Position> {
+  const manager = webApp?.isVersionAtLeast('8.0') ? webApp.LocationManager : undefined
+  if (manager === undefined) {
+    return browserPosition()
+  }
+  return new Promise((resolve, reject) => {
+    const request = () => {
+      if (!manager.isLocationAvailable) {
+        browserPosition().then(resolve, reject)
+        return
+      }
+      manager.getLocation((location) => {
+        if (location === null) {
+          reject(new PositionError(true))
+        } else {
+          resolve({ latitude: location.latitude, longitude: location.longitude })
+        }
+      })
+    }
+    if (manager.isInited) {
+      request()
+    } else {
+      manager.init(request)
+    }
+  })
+}
+
+// Второй раз Telegram не спрашивает: доступ, в котором отказали, включается только в настройках.
+export function canOpenLocationSettings(): boolean {
+  const manager = webApp?.isVersionAtLeast('8.0') ? webApp.LocationManager : undefined
+  return manager !== undefined && manager.isAccessRequested && !manager.isAccessGranted
+}
+
+export function openLocationSettings(): void {
+  webApp?.LocationManager.openSettings()
+}
+
+const positionTimeoutMs = 15_000
+const positionMaxAgeMs = 10 * 60 * 1000
+
+function browserPosition(): Promise<Position> {
+  return new Promise((resolve, reject) => {
+    if (!('geolocation' in navigator)) {
+      reject(new PositionError(false))
+      return
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => resolve({ latitude: position.coords.latitude, longitude: position.coords.longitude }),
+      (error) => reject(new PositionError(error.code === error.PERMISSION_DENIED)),
+      { timeout: positionTimeoutMs, maximumAge: positionMaxAgeMs },
+    )
+  })
 }

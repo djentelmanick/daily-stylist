@@ -29,8 +29,8 @@ func (location Location) Validate() error {
 	if utf8.RuneCountInString(location.Name) > MaxLocationNameLength || utf8.RuneCountInString(location.Region) > MaxLocationNameLength {
 		problems = append(problems, fmt.Sprintf("название длиннее %d символов", MaxLocationNameLength))
 	}
-	if !(location.Latitude >= -90 && location.Latitude <= 90) || !(location.Longitude >= -180 && location.Longitude <= 180) {
-		problems = append(problems, fmt.Sprintf("координаты вне диапазона: %v, %v", location.Latitude, location.Longitude))
+	if !location.coordinatesValid() {
+		problems = append(problems, location.coordinatesProblem())
 	}
 	// LoadLocation принимает "" и "Local" как пояс сервера, а нужен пояс города.
 	if _, err := time.LoadLocation(location.TimeZone); err != nil || location.TimeZone == "" || location.TimeZone == "Local" {
@@ -41,6 +41,21 @@ func (location Location) Validate() error {
 		return fmt.Errorf("%w: %s", ErrInvalidLocation, strings.Join(problems, "; "))
 	}
 	return nil
+}
+
+func (location Location) ValidateCoordinates() error {
+	if !location.coordinatesValid() {
+		return fmt.Errorf("%w: %s", ErrInvalidLocation, location.coordinatesProblem())
+	}
+	return nil
+}
+
+func (location Location) coordinatesValid() bool {
+	return location.Latitude >= -90 && location.Latitude <= 90 && location.Longitude >= -180 && location.Longitude <= 180
+}
+
+func (location Location) coordinatesProblem() string {
+	return fmt.Sprintf("координаты вне диапазона: %v, %v", location.Latitude, location.Longitude)
 }
 
 func (location Location) Zone() *time.Location {

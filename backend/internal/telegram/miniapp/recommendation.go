@@ -198,6 +198,23 @@ func (api *endpoints) searchCities(writer http.ResponseWriter, request *http.Req
 	writeJSON(writer, http.StatusOK, response)
 }
 
+func (api *endpoints) cityAt(writer http.ResponseWriter, request *http.Request) {
+	query := request.URL.Query()
+	latitude, latitudeErr := strconv.ParseFloat(query.Get("latitude"), 64)
+	longitude, longitudeErr := strconv.ParseFloat(query.Get("longitude"), 64)
+	if latitudeErr != nil || longitudeErr != nil {
+		writeError(writer, http.StatusBadRequest, "bad_request")
+		return
+	}
+
+	city, err := api.locations.CityAt(request.Context(), latitude, longitude)
+	if err != nil {
+		writeFailure(writer, err)
+		return
+	}
+	writeJSON(writer, http.StatusOK, toCityBody(city))
+}
+
 func (api *endpoints) setCity(writer http.ResponseWriter, request *http.Request) {
 	var body cityBody
 	if !decodeBody(writer, request, &body) {

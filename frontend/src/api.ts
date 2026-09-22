@@ -100,6 +100,7 @@ export type ApiErrorCode =
   | 'wardrobe_full'
   | 'invalid_location'
   | 'location_not_set'
+  | 'place_not_found'
   | 'invalid_settings'
   | 'weather_unavailable'
   | 'photo_too_large'
@@ -119,6 +120,7 @@ const serverErrorCodes: ApiErrorCode[] = [
   'wardrobe_full',
   'invalid_location',
   'location_not_set',
+  'place_not_found',
   'invalid_settings',
   'weather_unavailable',
   'photo_too_large',
@@ -231,6 +233,11 @@ export async function reviewOutfit(itemIds: number[]): Promise<string[]> {
 export async function searchCities(query: string): Promise<City[]> {
   const body = await request<{ cities: City[] }>('GET', `/api/cities?${new URLSearchParams({ query })}`)
   return body.cities
+}
+
+export function fetchCityAt(latitude: number, longitude: number): Promise<City> {
+  const query = new URLSearchParams({ latitude: String(latitude), longitude: String(longitude) })
+  return request<City>('GET', `/api/cities/at?${query}`)
 }
 
 export function saveCity(city: City): Promise<void> {

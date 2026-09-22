@@ -29,6 +29,7 @@ const (
 var (
 	_ service.Forecaster = (*Client)(nil)
 	_ service.CitySearch = (*Client)(nil)
+	_ service.TimeZones  = (*Client)(nil)
 )
 
 type Cache interface {
@@ -191,6 +192,25 @@ func (client *Client) SearchCities(ctx context.Context, query string) ([]domain.
 		}
 	}
 	return cities, nil
+}
+
+func (client *Client) TimeZoneAt(ctx context.Context, latitude, longitude float64) (string, error) {
+	values := url.Values{
+		"latitude":      {strconv.FormatFloat(latitude, 'f', -1, 64)},
+		"longitude":     {strconv.FormatFloat(longitude, 'f', -1, 64)},
+		"timezone":      {"auto"},
+		"forecast_days": {"1"},
+	}
+	var body struct {
+		Timezone string `json:"timezone"`
+	}
+	if err := client.get(ctx, client.forecastURL, values, &body); err != nil {
+		return "", fmt.Errorf("часовой пояс: %w", err)
+	}
+	if body.Timezone == "" {
+		return "", errors.New("часовой пояс: пустой ответ")
+	}
+	return body.Timezone, nil
 }
 
 // region отличает одноимённые города. Область с названием города

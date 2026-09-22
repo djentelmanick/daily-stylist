@@ -87,6 +87,16 @@ type CitySearch interface {
 	SearchCities(ctx context.Context, query string) ([]domain.Location, error)
 }
 
+var ErrPlaceNotFound = errors.New("место не найдено")
+
+type PlaceNames interface {
+	PlaceAt(ctx context.Context, latitude, longitude float64) (name, region string, err error)
+}
+
+type TimeZones interface {
+	TimeZoneAt(ctx context.Context, latitude, longitude float64) (string, error)
+}
+
 type SettingsRepository interface {
 	Get(ctx context.Context, userID int64) (domain.Settings, error)
 	Save(ctx context.Context, userID int64, settings domain.Settings) error

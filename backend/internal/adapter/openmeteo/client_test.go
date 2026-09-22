@@ -115,3 +115,22 @@ func TestSearchCities_NoResults(t *testing.T) {
 func unix(moment time.Time) string {
 	return strconv.FormatInt(moment.Unix(), 10)
 }
+
+func TestTimeZoneAt(t *testing.T) {
+	var query string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		query = request.URL.RawQuery
+		_, _ = writer.Write([]byte(`{"latitude":55.8125,"longitude":49.125,"timezone":"Europe/Moscow"}`))
+	}))
+	defer server.Close()
+	client := &Client{http: server.Client(), forecastURL: server.URL}
+
+	zone, err := client.TimeZoneAt(t.Context(), 55.79, 49.11)
+
+	if err != nil || zone != "Europe/Moscow" {
+		t.Errorf("TimeZoneAt = %q, %v", zone, err)
+	}
+	if want := "forecast_days=1&latitude=55.79&longitude=49.11&timezone=auto"; query != want {
+		t.Errorf("запрос = %s, ожидался %s", query, want)
+	}
+}

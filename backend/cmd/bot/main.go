@@ -11,6 +11,7 @@ import (
 	"time"
 	_ "time/tzdata"
 
+	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/nominatim"
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/openmeteo"
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/postgres"
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/recognizers"
@@ -92,7 +93,7 @@ func run() error {
 			cfg.Token,
 			wardrobe,
 			recommender,
-			service.NewLocations(locations, weather),
+			service.NewLocations(locations, weather, nominatim.NewClient(), weather),
 			service.NewSettings(postgres.NewSettingsRepository(pool)),
 			photos,
 			recognition,

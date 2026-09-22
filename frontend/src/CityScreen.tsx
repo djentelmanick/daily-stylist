@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { saveCity, searchCities, type City } from './api'
-import { useBackButton } from './telegram'
+import { fetchCityAt, saveCity, searchCities, type City } from './api'
+import { canOpenLocationSettings, getPosition, openLocationSettings, PositionError, useBackButton } from './telegram'
 import { errorText, texts } from './texts'
 import { Thinking } from './ui'
 
@@ -21,6 +21,8 @@ export function CityScreen({
   const [failed, setFailed] = useState<{ query: string; message: string } | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [locating, setLocating] = useState(false)
+  const [denied, setDenied] = useState(false)
 
   const trimmed = query.trim()
   const searchable = trimmed.length >= minQueryLength
@@ -64,12 +66,36 @@ export function CityScreen({
     }
   }
 
+  async function locate() {
+    setLocating(true)
+    setSaveError('')
+    setDenied(false)
+    try {
+      const position = await getPosition()
+      const city = await fetchCityAt(position.latitude, position.longitude)
+      setLocating(false)
+      await choose(city)
+    } catch (error) {
+      setLocating(false)
+      if (error instanceof PositionError) {
+        setDenied(error.denied)
+        setSaveError(error.denied ? texts.locationDenied : texts.locationUnavailable)
+      } else {
+        setSaveError(errorText(error))
+      }
+    }
+  }
+
   return (
     <div className="screen">
       <header>
         <h1>{texts.cityTitle}</h1>
         <p className="hint">{texts.cityHint}</p>
       </header>
+
+      <button type="button" className="button" disabled={locating || saving} onClick={locate}>
+        {locating ? <Thinking>{texts.locating}</Thinking> : texts.locate}
+      </button>
 
       <input
         type="text"
@@ -103,6 +129,11 @@ export function CityScreen({
 
       {searchError !== '' && <p className="notice notice-error">{searchError}</p>}
       {saveError !== '' && <p className="notice notice-error">{saveError}</p>}
+      {denied && canOpenLocationSettings() && (
+        <button type="button" className="link-button" onClick={openLocationSettings}>
+          {texts.openLocationSettings}
+        </button>
+      )}
     </div>
   )
 }

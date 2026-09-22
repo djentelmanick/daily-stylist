@@ -67,7 +67,7 @@ func newSettingsHandler(repository *memorySettings, locations *memoryLocations) 
 		testBotToken,
 		failingWardrobe{},
 		&stubRecommender{},
-		service.NewLocations(locations, stubCities{}),
+		service.NewLocations(locations, stubCities{}, nil, nil),
 		service.NewSettings(repository),
 		&stubPhotos{},
 		&stubRecognition{},
