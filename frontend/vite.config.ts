@@ -1,10 +1,10 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-// Go-сервер слушает BOT_LISTEN_ADDR, по умолчанию :2000.
-const backend = 'http://localhost:2000'
+// Go-сервер слушает BOT_LISTEN_ADDR, по умолчанию :2000. В docker адрес приходит из compose.
+const backend = process.env.VITE_BACKEND_URL ?? 'http://localhost:2000'
 // Хранилище фотографий из deploy/docker-compose.yml, порт S3_PORT.
-const storage = 'http://localhost:58333'
+const storage = process.env.VITE_STORAGE_URL ?? 'http://localhost:58333'
 
 export default defineConfig({
   plugins: [react()],

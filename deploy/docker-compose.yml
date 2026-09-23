@@ -1,3 +1,35 @@
+x-backend: &backend
+  build: ../backend
+  profiles: ["app"]
+  environment: &backend-env
+    DATABASE_URL: postgres://${POSTGRES_USER:-stylist}:${POSTGRES_PASSWORD:-stylist}@postgres:5432/${POSTGRES_DB:-stylist}
+    REDIS_URL: redis://redis:6379/0
+    RABBITMQ_URL: amqp://${RABBITMQ_USER:-stylist}:${RABBITMQ_PASSWORD:-stylist}@rabbitmq:5672/
+    S3_ENDPOINT: http://seaweedfs:8333
+    S3_PUBLIC_URL: ${S3_PUBLIC_URL}
+    S3_BUCKET: ${S3_BUCKET:-photos}
+    S3_ACCESS_KEY: ${S3_ACCESS_KEY:-stylist}
+    S3_SECRET_KEY: ${S3_SECRET_KEY:-stylist-secret}
+    S3_REGION: ${S3_REGION:-us-east-1}
+    TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+    TELEGRAM_WEBHOOK_BASE_URL: ${TELEGRAM_WEBHOOK_BASE_URL}
+    TELEGRAM_WEBHOOK_PATH: ${TELEGRAM_WEBHOOK_PATH:-/telegram/webhook}
+    TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET}
+    RECOGNIZER: ${RECOGNIZER:-gigachat}
+    RECOGNIZER_FALLBACK: ${RECOGNIZER_FALLBACK:-}
+    GIGACHAT_AUTH_KEY: ${GIGACHAT_AUTH_KEY:-}
+    GIGACHAT_MODEL: ${GIGACHAT_MODEL:-}
+    VISION_ADDR: vision:9090
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    redis:
+      condition: service_healthy
+    rabbitmq:
+      condition: service_healthy
+    seaweedfs:
+      condition: service_healthy
+
 services:
   postgres:
     image: postgres:18-alpine
@@ -59,8 +91,42 @@ services:
       timeout: 5s
       retries: 15
 
-  # Своя модель нужна, только когда RECOGNIZER или RECOGNIZER_FALLBACK - vision.
-  # Тогда: docker compose --profile vision up -d --wait vision
+  migrate:
+    build: ../backend
+    profiles: ["app"]
+    command: ["migrate", "up"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-stylist}:${POSTGRES_PASSWORD:-stylist}@postgres:5432/${POSTGRES_DB:-stylist}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  bot:
+    <<: *backend
+    command: ["bot"]
+    ports:
+      - "${BOT_PORT:-52000}:2000"
+
+  scheduler:
+    <<: *backend
+    command: ["scheduler"]
+
+  sender:
+    <<: *backend
+    command: ["sender"]
+
+  frontend:
+    build: ../frontend
+    profiles: ["app"]
+    environment:
+      VITE_BACKEND_URL: http://bot:2000
+      VITE_STORAGE_URL: http://seaweedfs:8333
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    depends_on:
+      - bot
+
+  # Своя модель нужна, только когда RECOGNIZER или RECOGNIZER_FALLBACK - vision: make vision.
   vision:
     build: ../vision
     profiles: ["vision"]

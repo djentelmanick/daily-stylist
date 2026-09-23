@@ -1,19 +1,28 @@
-.PHONY: help db db-down vision vision-build psql migrate migrate-status migrate-down migration proto redis-cli tun back sched sender front vision-venv check check-back check-db check-s3 check-redis check-rabbit check-vision check-gigachat check-front
+.PHONY: help dev docker docker-build stop down db db-down vision vision-build psql migrate migrate-status migrate-down migration proto redis-cli tun back sched sender front vision-venv check check-back check-db check-s3 check-redis check-rabbit check-vision check-gigachat check-front
 
 -include backend/.env
 
-export TEST_DATABASE_URL TEST_REDIS_URL TEST_RABBITMQ_URL
+export TEST_DATABASE_URL TEST_REDIS_URL TEST_RABBITMQ_URL NGROK_DOMAIN
 export TEST_S3_ENDPOINT TEST_S3_BUCKET S3_ACCESS_KEY S3_SECRET_KEY S3_REGION
 export GIGACHAT_AUTH_KEY GIGACHAT_AUTH_URL GIGACHAT_BASE_URL GIGACHAT_SCOPE GIGACHAT_MODEL
 
 COMPOSE = docker compose --env-file backend/.env -f deploy/docker-compose.yml
+# Своя модель поднимается, только если она выбрана распознавателем в backend/.env.
+VISION_PROFILE = $(if $(filter vision,$(RECOGNIZER) $(RECOGNIZER_FALLBACK)),--profile vision)
 GO_MODULE = github.com/djentelmanick/daily-stylist/backend
 PROTOC_PYTHON ?= $(CURDIR)/vision/.venv/bin/python
 
 help:
-	@echo "Сначала база: make db. Остальное - каждое в своём терминале, начиная с туннеля:"
+	@echo "Всё сразу:"
+	@echo "  make dev      - туннель и все процессы в одном терминале, инфраструктура в docker"
+	@echo "  make stop     - остановить все контейнеры, оставив их на месте"
+	@echo "  make down     - остановить и удалить контейнеры, данные в томах сохранятся"
+	@echo "  make docker   - поднять в docker вообще всё, включая бота и фронтенд"
+	@echo "  make docker-build - пересобрать образы бота и фронтенда"
+	@echo ""
+	@echo "По частям - каждое в своём терминале, начиная с туннеля:"
 	@echo "  make db      - Postgres, Redis, RabbitMQ и хранилище фотографий в docker, настройки из backend/.env"
-	@echo "  make db-down - остановить их, данные сохранятся"
+	@echo "  make db-down - остановить только их, данные сохранятся"
 	@echo "  make vision  - своя модель распознавания, нужна при RECOGNIZER=vision"
 	@echo "  make vision-build - пересобрать её образ после правок в vision/"
 	@echo "  make psql    - консоль базы"
@@ -45,11 +54,29 @@ help:
 	@echo "  make check-gigachat - живой запрос к GigaChat, тратит токены; в make check не входит"
 	@echo "  make check-front - линтер, типы и сборка фронтенда"
 
+dev:
+	$(COMPOSE) $(VISION_PROFILE) up -d --wait
+	cd backend && go run ./cmd/migrate up
+	./scripts/dev.sh
+
+stop:
+	$(COMPOSE) --profile vision --profile app stop
+
+down:
+	$(COMPOSE) --profile vision --profile app down
+
+docker: docker-build
+	$(COMPOSE) --profile app $(VISION_PROFILE) up -d --wait
+	@echo "поднято. Логи: $(COMPOSE) --profile app logs -f"
+
+docker-build:
+	$(COMPOSE) --profile app build
+
 db:
 	$(COMPOSE) up -d --wait
 
 db-down:
-	$(COMPOSE) --profile vision down
+	$(COMPOSE) down
 
 vision:
 	$(COMPOSE) --profile vision up -d --wait vision
