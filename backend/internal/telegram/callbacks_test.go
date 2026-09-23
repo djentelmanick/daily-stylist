@@ -43,15 +43,15 @@ func TestMorningKeyboard(t *testing.T) {
 
 	keyboard := morningKeyboard("https://xxx.ngrok-free.app", outfit)
 
-	buttons := keyboard.InlineKeyboard[0]
-	if len(buttons) != 2 {
-		t.Fatalf("кнопок %d, ожидались «надеваю» и «ещё варианты»", len(buttons))
+	rows := keyboard.InlineKeyboard
+	if len(rows) != 2 || len(rows[0]) != 1 || len(rows[1]) != 1 {
+		t.Fatalf("клавиатура = %+v, ожидались «надеваю» и «ещё варианты», по кнопке в ряд", rows)
 	}
-	if itemIDs, ok := WearItemIDs(buttons[0].CallbackData); !ok || !slices.Equal(itemIDs, []int64{3, 5}) {
-		t.Errorf("первая кнопка = %+v, ожидалась запись образа", buttons[0])
+	if itemIDs, ok := WearItemIDs(rows[0][0].CallbackData); !ok || !slices.Equal(itemIDs, []int64{3, 5}) {
+		t.Errorf("первая кнопка = %+v, ожидалась запись образа", rows[0][0])
 	}
-	if buttons[1].WebApp == nil || !strings.Contains(buttons[1].WebApp.URL, "screen=recommendation") {
-		t.Errorf("вторая кнопка = %+v, ожидалось открытие подбора в приложении", buttons[1])
+	if rows[1][0].WebApp == nil || !strings.Contains(rows[1][0].WebApp.URL, "screen=recommendation") {
+		t.Errorf("вторая кнопка = %+v, ожидалось открытие подбора в приложении", rows[1][0])
 	}
 }
 
@@ -63,7 +63,7 @@ func TestMorningKeyboardWithoutWearButton(t *testing.T) {
 
 	keyboard := morningKeyboard("https://xxx.ngrok-free.app", outfit)
 
-	if len(keyboard.InlineKeyboard[0]) != 1 {
-		t.Errorf("кнопок %d, ожидались только «ещё варианты»: образ в кнопку не влез", len(keyboard.InlineKeyboard[0]))
+	if len(keyboard.InlineKeyboard) != 1 || len(keyboard.InlineKeyboard[0]) != 1 {
+		t.Errorf("клавиатура = %+v, ожидались только «ещё варианты»: образ в кнопку не влез", keyboard.InlineKeyboard)
 	}
 }

@@ -57,16 +57,16 @@ func morningKeyboard(miniAppURL string, outfit domain.Outfit) *models.InlineKeyb
 		itemIDs[index] = item.ID
 	}
 
-	var buttons []models.InlineKeyboardButton
+	var rows [][]models.InlineKeyboardButton
 	if data := WearData(itemIDs); data != "" {
-		buttons = append(buttons, models.InlineKeyboardButton{Text: texts.Wear, CallbackData: data})
+		rows = append(rows, []models.InlineKeyboardButton{{Text: texts.Wear, CallbackData: data}})
 	}
-	buttons = append(buttons, models.InlineKeyboardButton{
+	rows = append(rows, []models.InlineKeyboardButton{{
 		Text:   texts.MoreOutfits,
 		WebApp: &models.WebAppInfo{URL: recommendationURL(miniAppURL)},
-	})
+	}})
 
-	return &models.InlineKeyboardMarkup{InlineKeyboard: [][]models.InlineKeyboardButton{buttons}}
+	return &models.InlineKeyboardMarkup{InlineKeyboard: rows}
 }
 
 func recommendationURL(miniAppURL string) string {
