@@ -134,3 +134,43 @@ func TestTimeZoneAt(t *testing.T) {
 		t.Errorf("запрос = %s, ожидался %s", query, want)
 	}
 }
+
+func TestSearchCities_RetriesAfterServiceFailure(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		attempts++
+		if attempts < 3 {
+			writer.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		_, _ = writer.Write([]byte(`{"results":[{"name":"Казань","country_code":"RU","admin1":"Татарстан","latitude":55.79,"longitude":49.11,"timezone":"Europe/Moscow"}]}`))
+	}))
+	t.Cleanup(server.Close)
+	client := &Client{http: server.Client(), geocodingURL: server.URL}
+
+	cities, err := client.SearchCities(t.Context(), "Казань")
+
+	if err != nil || len(cities) != 1 {
+		t.Fatalf("SearchCities = %v, %v, ожидался один город с третьей попытки", cities, err)
+	}
+	if attempts != 3 {
+		t.Errorf("попыток %d, ожидалось 3", attempts)
+	}
+}
+
+func TestSearchCities_DoesNotRetryOwnMistake(t *testing.T) {
+	attempts := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		attempts++
+		writer.WriteHeader(http.StatusBadRequest)
+	}))
+	t.Cleanup(server.Close)
+	client := &Client{http: server.Client(), geocodingURL: server.URL}
+
+	if _, err := client.SearchCities(t.Context(), "Казань"); err == nil {
+		t.Fatal("SearchCities вернул успех на ответ 400")
+	}
+	if attempts != 1 {
+		t.Errorf("попыток %d, ожидалась одна: повтор неверный запрос не исправит", attempts)
+	}
+}

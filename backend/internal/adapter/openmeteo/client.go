@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sethvargo/go-retry"
+
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
 )
@@ -20,10 +22,13 @@ import (
 const (
 	forecastURL      = "https://api.open-meteo.com/v1/forecast"
 	geocodingURL     = "https://geocoding-api.open-meteo.com/v1/search"
-	requestTimeout   = 5 * time.Second
+	requestTimeout   = 3 * time.Second
 	maxResponseBytes = 1 << 20
 	maxCities        = 8
 	forecastCacheTTL = time.Hour
+
+	maxAttempts = 3
+	retryPause  = 200 * time.Millisecond
 )
 
 var (
@@ -234,7 +239,26 @@ func (client *Client) get(ctx context.Context, endpoint string, query url.Values
 }
 
 func (client *Client) fetch(ctx context.Context, endpoint string, query url.Values) ([]byte, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"?"+query.Encode(), nil)
+	address := endpoint + "?" + query.Encode()
+	backoff := retry.WithMaxRetries(maxAttempts-1, retry.NewExponential(retryPause))
+
+	var body []byte
+	attempt := 0
+	err := retry.Do(ctx, backoff, func(ctx context.Context) error {
+		attempt++
+		var err error
+		body, err = client.attempt(ctx, address)
+		if err == nil || !worthRetry(err) {
+			return err
+		}
+		log.Printf("open-meteo: %s, попытка %d из %d: %v", endpoint, attempt, maxAttempts, err)
+		return retry.RetryableError(err)
+	})
+	return body, err
+}
+
+func (client *Client) attempt(ctx context.Context, address string) ([]byte, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +269,25 @@ func (client *Client) fetch(ctx context.Context, endpoint string, query url.Valu
 	defer func() { _ = response.Body.Close() }()
 
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ответ %s", response.Status)
+		return nil, statusError{status: response.StatusCode, text: response.Status}
 	}
 	return io.ReadAll(io.LimitReader(response.Body, maxResponseBytes))
+}
+
+// Свой неправильный запрос повтором не исправить, а отказ сервиса или обрыв связи - часто да.
+func worthRetry(err error) bool {
+	var refused statusError
+	if errors.As(err, &refused) {
+		return refused.status >= http.StatusInternalServerError
+	}
+	return true
+}
+
+type statusError struct {
+	status int
+	text   string
+}
+
+func (err statusError) Error() string {
+	return fmt.Sprintf("ответ %s", err.text)
 }
