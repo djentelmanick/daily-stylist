@@ -15,13 +15,14 @@ type outfits interface {
 	WearToday(ctx context.Context, userID int64, itemIDs []int64) error
 }
 
-func New(outfits outfits) bot.HandlerFunc {
-	handler := &handler{outfits: outfits}
+func New(outfits outfits, miniAppURL string) bot.HandlerFunc {
+	handler := &handler{outfits: outfits, miniAppURL: miniAppURL}
 	return handler.handle
 }
 
 type handler struct {
-	outfits outfits
+	outfits    outfits
+	miniAppURL string
 }
 
 func (h *handler) handle(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -36,7 +37,7 @@ func (h *handler) handle(ctx context.Context, b *bot.Bot, update *models.Update)
 		return
 	}
 
-	if _, err := b.SendMessage(ctx, welcome(message)); err != nil {
+	if _, err := b.SendMessage(ctx, welcome(message, h.miniAppURL)); err != nil {
 		log.Printf("telegram: отправка сообщения в чат %d: %v", message.Chat.ID, err)
 	}
 }
@@ -97,7 +98,7 @@ func answer(ctx context.Context, b *bot.Bot, queryID, text string) {
 	}
 }
 
-func welcome(message *models.Message) *bot.SendMessageParams {
+func welcome(message *models.Message, miniAppURL string) *bot.SendMessageParams {
 	var firstName string
 	if message.From != nil {
 		firstName = message.From.FirstName
@@ -106,5 +107,8 @@ func welcome(message *models.Message) *bot.SendMessageParams {
 	return &bot.SendMessageParams{
 		ChatID: message.Chat.ID,
 		Text:   texts.Welcome(firstName),
+		ReplyMarkup: &models.InlineKeyboardMarkup{InlineKeyboard: [][]models.InlineKeyboardButton{{
+			{Text: texts.OpenApp, WebApp: &models.WebAppInfo{URL: miniAppURL}},
+		}}},
 	}
 }

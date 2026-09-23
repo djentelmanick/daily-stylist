@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { fetchCityAt, saveCity, searchCities, type City } from './api'
 import { canOpenLocationSettings, getPosition, openLocationSettings, PositionError, useBackButton } from './telegram'
 import { errorText, texts } from './texts'
@@ -8,12 +8,16 @@ const searchDelayMs = 300
 
 export function CityScreen({
   minQueryLength,
+  header,
+  footer,
   onBack,
   onSaved,
 }: {
   minQueryLength: number
+  header?: ReactNode
+  footer?: ReactNode
   onBack: () => void
-  onSaved: () => void
+  onSaved: (city: City) => void
 }) {
   useBackButton(onBack)
   const [query, setQuery] = useState('')
@@ -59,9 +63,11 @@ export function CityScreen({
     setSaveError('')
     try {
       await saveCity(city)
-      onSaved()
+      setQuery('')
+      onSaved(city)
     } catch (error) {
       setSaveError(errorText(error))
+    } finally {
       setSaving(false)
     }
   }
@@ -88,10 +94,12 @@ export function CityScreen({
 
   return (
     <div className="screen">
-      <header>
-        <h1>{texts.cityTitle}</h1>
-        <p className="hint">{texts.cityHint}</p>
-      </header>
+      {header ?? (
+        <header>
+          <h1>{texts.cityTitle}</h1>
+          <p className="hint">{texts.cityHint}</p>
+        </header>
+      )}
 
       <button type="button" className="button" disabled={locating || saving} onClick={locate}>
         {locating ? <Thinking>{texts.locating}</Thinking> : texts.locate}
@@ -134,6 +142,7 @@ export function CityScreen({
           {texts.openLocationSettings}
         </button>
       )}
+      {footer}
     </div>
   )
 }

@@ -98,7 +98,7 @@ func run() error {
 			photos,
 			recognition,
 		),
-	}, handlers.New(recommender))
+	}, handlers.New(recommender, cfg.WebhookBaseURL))
 	if err != nil {
 		return err
 	}

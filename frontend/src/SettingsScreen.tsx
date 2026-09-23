@@ -7,8 +7,16 @@ import { Thinking } from './ui'
 // Не на каждую цифру: иначе поле перерисовывается прямо посреди набора.
 const saveDelayMs = 800
 
-export function SettingsScreen({ onBack, onChooseCity }: { onBack: () => void; onChooseCity: () => void }) {
-  useBackButton(onBack)
+export type SettingsState = {
+  settings: Settings | null
+  sendAt: string
+  setSendAt: (sendAt: string) => void
+  save: (changed: Settings) => Promise<void>
+  saving: boolean
+  error: string
+}
+
+export function useSettings(): SettingsState {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [sendAt, setSendAt] = useState('')
   const [saving, setSaving] = useState(false)
@@ -72,6 +80,51 @@ export function SettingsScreen({ onBack, onChooseCity }: { onBack: () => void; o
     }
   }
 
+  return { settings, sendAt, setSendAt, save, saving, error }
+}
+
+export function MorningCard({
+  settings,
+  sendAt,
+  setSendAt,
+  save,
+  saving,
+}: SettingsState & { settings: Settings }) {
+  return (
+    <section className="status-card">
+      <h2 className="field-title">{texts.morningTitle}</h2>
+      <div className="status-options">
+        {[true, false].map((enabled) => (
+          <button
+            key={String(enabled)}
+            type="button"
+            className={enabled === settings.morning_enabled ? 'status-option status-option-selected' : 'status-option'}
+            aria-pressed={enabled === settings.morning_enabled}
+            disabled={saving}
+            onClick={() => enabled !== settings.morning_enabled && save({ ...settings, morning_enabled: enabled })}
+          >
+            {enabled ? texts.morningOn : texts.morningOff}
+          </button>
+        ))}
+      </div>
+
+      {settings.morning_enabled ? (
+        <label className="field">
+          <span className="field-title">{texts.sendAt}</span>
+          <input type="time" value={sendAt} onChange={(event) => setSendAt(event.target.value)} />
+        </label>
+      ) : (
+        <p className="hint">{texts.morningOffHint}</p>
+      )}
+    </section>
+  )
+}
+
+export function SettingsScreen({ onBack, onChooseCity }: { onBack: () => void; onChooseCity: () => void }) {
+  useBackButton(onBack)
+  const state = useSettings()
+  const { settings, error } = state
+
   return (
     <div className="screen">
       <h1>{texts.settingsTitle}</h1>
@@ -84,34 +137,7 @@ export function SettingsScreen({ onBack, onChooseCity }: { onBack: () => void; o
         )
       ) : (
         <>
-          <section className="status-card">
-            <h2 className="field-title">{texts.morningTitle}</h2>
-            <div className="status-options">
-              {[true, false].map((enabled) => (
-                <button
-                  key={String(enabled)}
-                  type="button"
-                  className={
-                    enabled === settings.morning_enabled ? 'status-option status-option-selected' : 'status-option'
-                  }
-                  aria-pressed={enabled === settings.morning_enabled}
-                  disabled={saving}
-                  onClick={() => enabled !== settings.morning_enabled && save({ ...settings, morning_enabled: enabled })}
-                >
-                  {enabled ? texts.morningOn : texts.morningOff}
-                </button>
-              ))}
-            </div>
-
-            {settings.morning_enabled ? (
-              <label className="field">
-                <span className="field-title">{texts.sendAt}</span>
-                <input type="time" value={sendAt} onChange={(event) => setSendAt(event.target.value)} />
-              </label>
-            ) : (
-              <p className="hint">{texts.morningOffHint}</p>
-            )}
-          </section>
+          <MorningCard {...state} settings={settings} />
 
           <section className="status-card">
             <h2 className="field-title">{texts.city}</h2>

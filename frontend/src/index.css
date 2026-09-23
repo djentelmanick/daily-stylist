@@ -1109,3 +1109,18 @@ textarea:focus {
   opacity: 0.5;
   cursor: default;
 }
+
+.basics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.basics li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}

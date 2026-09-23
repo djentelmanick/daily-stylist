@@ -4,6 +4,7 @@ import { CityScreen } from './CityScreen'
 import { HomeScreen } from './HomeScreen'
 import { AddItemScreen, EditItemScreen } from './ItemFormScreens'
 import { ItemScreen, PhotoScreen } from './ItemScreen'
+import { hasBasics, OnboardingScreen, type OnboardingStep } from './OnboardingScreen'
 import { PickItemScreen } from './PickItemScreen'
 import { RecommendationScreen, type RecommendationMemory } from './RecommendationScreen'
 import { SettingsScreen } from './SettingsScreen'
@@ -75,6 +76,7 @@ type Screen =
   | { kind: 'city' }
   | { kind: 'settings' }
   | { kind: 'today' }
+  | { kind: 'onboarding'; step: OnboardingStep }
   | { kind: 'pick'; target: 'recommendation' | 'today'; outfit: number[]; replace: number | null }
 
 const screenKinds = [
@@ -90,20 +92,22 @@ const screenKinds = [
   'settings',
   'today',
   'pick',
+  'onboarding',
 ]
 const openScreens = 'screens'
 
 // Телефон и Telegram перезагружают страницу когда угодно - например, пока открыт
 // выбор фотографии. Без этого пользователь возвращался бы на главный экран.
-function restoreScreens(): Screen[] {
+function restoreScreens(needsOnboarding: boolean): Screen[] {
   const stored = recall<Screen[]>(openScreens)
-  if (stored === null || stored.length === 0 || !stored.every((screen) => screenKinds.includes(screen?.kind))) {
-    // Кнопка «Ещё варианты» в утреннем сообщении открывает приложение сразу на подборе.
-    return new URLSearchParams(window.location.search).get('screen') === 'recommendation'
-      ? [{ kind: 'home' }, { kind: 'recommendation' }]
-      : [{ kind: 'home' }]
+  if (stored !== null && stored.length > 0 && stored.every((screen) => screenKinds.includes(screen?.kind))) {
+    return stored
   }
-  return stored
+  // Кнопка «Ещё варианты» в утреннем сообщении открывает приложение сразу на подборе.
+  if (new URLSearchParams(window.location.search).get('screen') === 'recommendation') {
+    return [{ kind: 'home' }, { kind: 'recommendation' }]
+  }
+  return needsOnboarding ? [{ kind: 'home' }, { kind: 'onboarding', step: 'city' }] : [{ kind: 'home' }]
 }
 
 // Экраны лежат стопкой: открыть - положить сверху, «Назад» - снять верхний.
@@ -120,7 +124,8 @@ function Screens({
   const [items, setItems] = useState(initialItems)
   const [todayOutfit, setTodayOutfit] = useState(initialTodayOutfit)
   const recommendation = useRef<RecommendationMemory>({ recommendation: null, index: 0 })
-  const [stack, setStack] = useState<Screen[]>(restoreScreens)
+  // Пока в гардеробе нет основы образа, подбирать не из чего: сначала знакомство.
+  const [stack, setStack] = useState<Screen[]>(() => restoreScreens(!hasBasics(initialItems)))
   const screen = stack[stack.length - 1]
 
   useEffect(() => {
@@ -137,6 +142,11 @@ function Screens({
     savedScroll.current.push(window.scrollY)
     nextScroll.current = 0
     setStack((current) => [...current, next])
+  }
+
+  function replace(next: Screen) {
+    nextScroll.current = 0
+    setStack((current) => [...current.slice(0, -1), next])
   }
 
   function back() {
@@ -275,6 +285,22 @@ function Screens({
           replace={screen.replace}
           onPick={(picked) => pick(screen.target, screen.replace, picked)}
           onBack={back}
+        />
+      )
+    case 'onboarding':
+      return (
+        <OnboardingScreen
+          options={options}
+          step={screen.step}
+          items={items}
+          onStep={(step) => replace({ kind: 'onboarding', step })}
+          onAddItem={() => open({ kind: 'add' })}
+          onOpenItem={(itemId) => open({ kind: 'item', itemId })}
+          onFinish={() => {
+            forgetRecommendation()
+            replace({ kind: 'recommendation' })
+          }}
+          onClose={back}
         />
       )
     case 'settings':
