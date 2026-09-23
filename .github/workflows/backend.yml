@@ -49,6 +49,15 @@ jobs:
           --health-interval 2s
           --health-timeout 3s
           --health-retries 15
+      rabbitmq:
+        image: rabbitmq:4-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q check_running"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 15
     steps:
       - uses: actions/checkout@v7
 
@@ -77,6 +86,7 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://stylist:stylist@localhost:5432/stylist
           TEST_REDIS_URL: redis://localhost:6379/1
+          TEST_RABBITMQ_URL: amqp://guest:guest@localhost:5672/
 
   lint:
     name: golangci-lint

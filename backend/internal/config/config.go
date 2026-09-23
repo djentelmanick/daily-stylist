@@ -19,6 +19,9 @@ const (
 	defaultS3Region      = "us-east-1"
 	defaultVisionAddr    = "localhost:59090"
 
+	// Телеграм не даёт слать в один чат чаще раза в секунду, брать задачи пачкой незачем.
+	defaultSenderPrefetch = 1
+
 	defaultGigaChatAuthURL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
 	defaultGigaChatBaseURL = "https://api.giga.chat/v1"
 	defaultGigaChatScope   = "GIGACHAT_API_PERS"
@@ -145,23 +148,46 @@ func (recognition Recognition) uses(name string) bool {
 }
 
 type Scheduler struct {
-	Token       string
-	MiniAppURL  string
 	DatabaseURL string
-	RedisURL    string
+	RabbitURL   string
 }
 
 func LoadScheduler() (Scheduler, error) {
 	var env envReader
 
 	cfg := Scheduler{
+		DatabaseURL: env.required("DATABASE_URL"),
+		RabbitURL:   env.required("RABBITMQ_URL"),
+	}
+	if err := env.err(); err != nil {
+		return Scheduler{}, err
+	}
+
+	return cfg, nil
+}
+
+type Sender struct {
+	Token       string
+	MiniAppURL  string
+	DatabaseURL string
+	RedisURL    string
+	RabbitURL   string
+	Prefetch    int
+}
+
+func LoadSender() (Sender, error) {
+	var env envReader
+
+	cfg := Sender{
 		Token:       env.required("TELEGRAM_BOT_TOKEN"),
 		MiniAppURL:  env.required("TELEGRAM_WEBHOOK_BASE_URL"),
 		DatabaseURL: env.required("DATABASE_URL"),
 		RedisURL:    env.required("REDIS_URL"),
+		RabbitURL:   env.required("RABBITMQ_URL"),
+		Prefetch:    defaultSenderPrefetch,
 	}
 	if err := env.err(); err != nil {
-		return Scheduler{}, err
+		return Sender{}, err
 	}
 
 	return cfg, nil

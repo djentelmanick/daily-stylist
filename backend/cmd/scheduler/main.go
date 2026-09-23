@@ -11,12 +11,10 @@ import (
 	"time"
 	_ "time/tzdata"
 
-	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/openmeteo"
 	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/postgres"
-	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/redis"
+	"github.com/djentelmanick/daily-stylist/backend/internal/adapter/rabbitmq"
 	"github.com/djentelmanick/daily-stylist/backend/internal/config"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
-	"github.com/djentelmanick/daily-stylist/backend/internal/telegram"
 )
 
 const tick = time.Minute
@@ -51,31 +49,25 @@ func run() error {
 		return err
 	}
 
-	redisClient, err := redis.Connect(ctx, cfg.RedisURL)
+	connection, err := rabbitmq.Connect(cfg.RabbitURL)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = redisClient.Close() }()
+	defer func() { _ = connection.Close() }()
 
-	notifier, err := telegram.NewNotifier(ctx, cfg.Token, cfg.MiniAppURL)
+	tasks, err := rabbitmq.NewTasks(connection, rabbitmq.MorningTopology())
 	if err != nil {
 		return err
 	}
+	defer func() { _ = tasks.Close() }()
 
-	recommender := service.NewRecommender(
-		postgres.NewItemRepository(pool),
-		postgres.NewOutfitRepository(pool),
-		postgres.NewLocationRepository(pool),
-		openmeteo.NewClient(redis.NewCache(redisClient)),
-		time.Now,
-	)
-	morning := service.NewMorning(postgres.NewDeliveryRepository(pool), recommender, notifier, time.Now)
+	planner := service.NewMorningPlanner(postgres.NewDeliveryRepository(pool), tasks, time.Now)
 
 	log.Printf("планировщик запущен, проверяю раз в %s", tick)
 	ticker := time.NewTicker(tick)
 	defer ticker.Stop()
 	for {
-		if err := morning.SendDue(ctx); err != nil && ctx.Err() == nil {
+		if err := planner.PublishDue(ctx); err != nil && ctx.Err() == nil {
 			log.Print(err)
 		}
 		select {

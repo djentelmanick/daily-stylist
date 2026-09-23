@@ -43,6 +43,22 @@ services:
       timeout: 3s
       retries: 15
 
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-stylist}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-stylist}
+    ports:
+      - "${RABBITMQ_PORT:-55672}:5672"
+      - "${RABBITMQ_UI_PORT:-55673}:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "check_running"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
   # Своя модель нужна, только когда RECOGNIZER или RECOGNIZER_FALLBACK - vision.
   # Тогда: docker compose --profile vision up -d --wait vision
   vision:
@@ -60,3 +76,4 @@ services:
 volumes:
   postgres-data:
   seaweedfs-data:
+  rabbitmq-data:

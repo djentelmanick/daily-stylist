@@ -12,33 +12,59 @@ import (
 
 var morningDay = date(2026, 9, 16)
 
-func TestMorning_SendsToEveryoneDue(t *testing.T) {
+func TestMorningPlanner_PublishesTaskForEveryoneDue(t *testing.T) {
 	deliveries := &fakeDeliveries{due: []service.MorningDelivery{{UserID: 42, Day: morningDay}, {UserID: 7, Day: morningDay}}}
-	notifier := &fakeNotifier{}
-	morning := service.NewMorning(deliveries, &fakeMorningRecommender{recommendation: outfitFor("Футболка")}, notifier, fixedNow)
+	tasks := &fakeTasks{}
+	planner := service.NewMorningPlanner(deliveries, tasks, fixedNow)
 
-	if err := morning.SendDue(t.Context()); err != nil {
-		t.Fatalf("SendDue: %v", err)
+	if err := planner.PublishDue(t.Context()); err != nil {
+		t.Fatalf("PublishDue: %v", err)
 	}
 
-	if !slices.Equal(notifier.sent, []int64{42, 7}) {
-		t.Errorf("рекомендация ушла %v, ожидались оба пользователя", notifier.sent)
+	if !slices.Equal(tasks.published, []int64{42, 7}) {
+		t.Errorf("поставлены задачи %v, ожидались оба пользователя", tasks.published)
 	}
-	if len(deliveries.claimed) != 2 || len(deliveries.released) != 0 {
-		t.Errorf("занято дней %d, возвращено %d, ожидалось 2 и 0", len(deliveries.claimed), len(deliveries.released))
+	if len(deliveries.claimed) != 0 {
+		t.Error("планировщик занял день, хотя это дело отправщика")
 	}
 	if deliveries.params.Window != service.MorningWindow || deliveries.params.Defaults != domain.DefaultSettings() {
 		t.Errorf("параметры выборки = %+v", deliveries.params)
 	}
 }
 
-func TestMorning_SkipsDayTakenByAnother(t *testing.T) {
-	deliveries := &fakeDeliveries{due: []service.MorningDelivery{{UserID: 42, Day: morningDay}}, taken: true}
-	notifier := &fakeNotifier{}
-	morning := service.NewMorning(deliveries, &fakeMorningRecommender{recommendation: outfitFor("Футболка")}, notifier, fixedNow)
+func TestMorningPlanner_ReportsQueueFailure(t *testing.T) {
+	deliveries := &fakeDeliveries{due: []service.MorningDelivery{{UserID: 42, Day: morningDay}}}
+	planner := service.NewMorningPlanner(deliveries, &fakeTasks{err: errors.New("очередь недоступна")}, fixedNow)
 
-	if err := morning.SendDue(t.Context()); err != nil {
-		t.Fatalf("SendDue: %v", err)
+	if err := planner.PublishDue(t.Context()); err == nil {
+		t.Error("ошибка очереди потерялась, о ней некому узнать")
+	}
+}
+
+func TestMorningSender_SendsRecommendation(t *testing.T) {
+	deliveries := &fakeDeliveries{}
+	notifier := &fakeNotifier{}
+	sender := service.NewMorningSender(deliveries, &fakeMorningRecommender{recommendation: outfitFor("Футболка")}, notifier)
+
+	if err := sender.Deliver(t.Context(), service.MorningDelivery{UserID: 42, Day: morningDay}); err != nil {
+		t.Fatalf("Deliver: %v", err)
+	}
+
+	if !slices.Equal(notifier.sent, []int64{42}) {
+		t.Errorf("рекомендация ушла %v, ожидался пользователь 42", notifier.sent)
+	}
+	if len(deliveries.claimed) != 1 || len(deliveries.released) != 0 {
+		t.Errorf("занято дней %d, возвращено %d, ожидалось 1 и 0", len(deliveries.claimed), len(deliveries.released))
+	}
+}
+
+func TestMorningSender_SkipsDayTakenByAnother(t *testing.T) {
+	deliveries := &fakeDeliveries{taken: true}
+	notifier := &fakeNotifier{}
+	sender := service.NewMorningSender(deliveries, &fakeMorningRecommender{recommendation: outfitFor("Футболка")}, notifier)
+
+	if err := sender.Deliver(t.Context(), service.MorningDelivery{UserID: 42, Day: morningDay}); err != nil {
+		t.Fatalf("Deliver: %v", err)
 	}
 
 	if len(notifier.sent) != 0 {
@@ -46,7 +72,7 @@ func TestMorning_SkipsDayTakenByAnother(t *testing.T) {
 	}
 }
 
-func TestMorning_ReturnsDayAfterFailure(t *testing.T) {
+func TestMorningSender_ReturnsDayAfterFailure(t *testing.T) {
 	tests := map[string]struct {
 		recommender *fakeMorningRecommender
 		notifier    *fakeNotifier
@@ -63,41 +89,39 @@ func TestMorning_ReturnsDayAfterFailure(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			deliveries := &fakeDeliveries{due: []service.MorningDelivery{{UserID: 42, Day: morningDay}}}
-			morning := service.NewMorning(deliveries, test.recommender, test.notifier, fixedNow)
+			deliveries := &fakeDeliveries{}
+			sender := service.NewMorningSender(deliveries, test.recommender, test.notifier)
 
-			if err := morning.SendDue(t.Context()); err != nil {
-				t.Fatalf("SendDue: %v", err)
+			if err := sender.Deliver(t.Context(), service.MorningDelivery{UserID: 42, Day: morningDay}); err == nil {
+				t.Error("ошибка потерялась, задача считается выполненной")
 			}
-
 			if len(deliveries.released) != 1 {
-				t.Errorf("день не возвращён в работу, следующая минута не попробует снова")
+				t.Error("день не возвращён в работу, следующая минута не попробует снова")
 			}
 		})
 	}
 }
 
-func TestMorning_KeepsDayWhenChatUnavailable(t *testing.T) {
-	deliveries := &fakeDeliveries{due: []service.MorningDelivery{{UserID: 42, Day: morningDay}}}
+func TestMorningSender_KeepsDayWhenChatUnavailable(t *testing.T) {
+	deliveries := &fakeDeliveries{}
 	notifier := &fakeNotifier{err: service.ErrChatUnavailable}
-	morning := service.NewMorning(deliveries, &fakeMorningRecommender{recommendation: outfitFor("Футболка")}, notifier, fixedNow)
+	sender := service.NewMorningSender(deliveries, &fakeMorningRecommender{recommendation: outfitFor("Футболка")}, notifier)
 
-	if err := morning.SendDue(t.Context()); err != nil {
-		t.Fatalf("SendDue: %v", err)
+	if err := sender.Deliver(t.Context(), service.MorningDelivery{UserID: 42, Day: morningDay}); err == nil {
+		t.Error("ошибка потерялась, задача считается выполненной")
 	}
-
 	if len(deliveries.released) != 0 {
 		t.Error("день возвращён в работу, хотя бота заблокировали: повтор ничего не изменит")
 	}
 }
 
-func TestMorning_SilentWhenNothingToRecommend(t *testing.T) {
-	deliveries := &fakeDeliveries{due: []service.MorningDelivery{{UserID: 42, Day: morningDay}}}
+func TestMorningSender_SilentWhenNothingToRecommend(t *testing.T) {
+	deliveries := &fakeDeliveries{}
 	notifier := &fakeNotifier{}
-	morning := service.NewMorning(deliveries, &fakeMorningRecommender{}, notifier, fixedNow)
+	sender := service.NewMorningSender(deliveries, &fakeMorningRecommender{}, notifier)
 
-	if err := morning.SendDue(t.Context()); err != nil {
-		t.Fatalf("SendDue: %v", err)
+	if err := sender.Deliver(t.Context(), service.MorningDelivery{UserID: 42, Day: morningDay}); err != nil {
+		t.Fatalf("Deliver: %v", err)
 	}
 
 	if len(notifier.sent) != 0 {
@@ -113,6 +137,19 @@ func outfitFor(name string) service.Recommendation {
 		Location: vladivostok,
 		Outfits:  []domain.Outfit{{Items: []domain.Item{testItem(1, name, domain.CategoryTop)}}},
 	}
+}
+
+type fakeTasks struct {
+	published []int64
+	err       error
+}
+
+func (tasks *fakeTasks) Publish(_ context.Context, delivery service.MorningDelivery) error {
+	if tasks.err != nil {
+		return tasks.err
+	}
+	tasks.published = append(tasks.published, delivery.UserID)
+	return nil
 }
 
 type fakeDeliveries struct {

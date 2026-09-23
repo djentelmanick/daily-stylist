@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
@@ -18,25 +17,20 @@ type morningRecommender interface {
 	Recommend(ctx context.Context, userID int64) (Recommendation, error)
 }
 
-type Morning struct {
-	deliveries  DeliveryRepository
-	recommender morningRecommender
-	notifier    Notifier
-	now         func() time.Time
+// Планировщик только ищет, кому пора: собирает образ и отправляет его MorningSender.
+type MorningPlanner struct {
+	deliveries DeliveryRepository
+	tasks      MorningTasks
+	now        func() time.Time
 }
 
-func NewMorning(
-	deliveries DeliveryRepository,
-	recommender morningRecommender,
-	notifier Notifier,
-	now func() time.Time,
-) *Morning {
-	return &Morning{deliveries: deliveries, recommender: recommender, notifier: notifier, now: now}
+func NewMorningPlanner(deliveries DeliveryRepository, tasks MorningTasks, now func() time.Time) *MorningPlanner {
+	return &MorningPlanner{deliveries: deliveries, tasks: tasks, now: now}
 }
 
-func (morning *Morning) SendDue(ctx context.Context) error {
-	due, err := morning.deliveries.Due(ctx, DueParams{
-		Now:      morning.now(),
+func (planner *MorningPlanner) PublishDue(ctx context.Context) error {
+	due, err := planner.deliveries.Due(ctx, DueParams{
+		Now:      planner.now(),
 		Window:   MorningWindow,
 		Defaults: domain.DefaultSettings(),
 	})
@@ -44,40 +38,52 @@ func (morning *Morning) SendDue(ctx context.Context) error {
 		return fmt.Errorf("утренняя рассылка: %w", err)
 	}
 
+	// День занимает отправщик, поэтому неудачная постановка ничего не теряет:
+	// следующая минута найдёт тех же людей снова.
 	for _, delivery := range due {
-		if err := morning.send(ctx, delivery); err != nil {
-			log.Printf("утренняя рассылка пользователю %d: %v", delivery.UserID, err)
+		if err := planner.tasks.Publish(ctx, delivery); err != nil {
+			return fmt.Errorf("утренняя рассылка: %w", err)
 		}
 	}
 	return nil
 }
 
-func (morning *Morning) send(ctx context.Context, delivery MorningDelivery) error {
-	claimed, err := morning.deliveries.Claim(ctx, delivery)
+type MorningSender struct {
+	deliveries  DeliveryRepository
+	recommender morningRecommender
+	notifier    Notifier
+}
+
+func NewMorningSender(deliveries DeliveryRepository, recommender morningRecommender, notifier Notifier) *MorningSender {
+	return &MorningSender{deliveries: deliveries, recommender: recommender, notifier: notifier}
+}
+
+func (sender *MorningSender) Deliver(ctx context.Context, delivery MorningDelivery) error {
+	claimed, err := sender.deliveries.Claim(ctx, delivery)
 	if err != nil || !claimed {
 		return err
 	}
 
-	recommendation, err := morning.recommender.Recommend(ctx, delivery.UserID)
+	recommendation, err := sender.recommender.Recommend(ctx, delivery.UserID)
 	if err != nil {
-		return morning.release(ctx, delivery, err)
+		return sender.release(ctx, delivery, err)
 	}
 	// День не возвращаем: за оставшийся час гардероб вряд ли изменится.
 	if len(recommendation.Outfits) == 0 {
 		return nil
 	}
 
-	if err := morning.notifier.SendRecommendation(ctx, delivery.UserID, recommendation); err != nil {
+	if err := sender.notifier.SendRecommendation(ctx, delivery.UserID, recommendation); err != nil {
 		if errors.Is(err, ErrChatUnavailable) {
 			return err
 		}
-		return morning.release(ctx, delivery, err)
+		return sender.release(ctx, delivery, err)
 	}
 	return nil
 }
 
-func (morning *Morning) release(ctx context.Context, delivery MorningDelivery, cause error) error {
-	if err := morning.deliveries.Release(ctx, delivery); err != nil {
+func (sender *MorningSender) release(ctx context.Context, delivery MorningDelivery, cause error) error {
+	if err := sender.deliveries.Release(ctx, delivery); err != nil {
 		return errors.Join(cause, err)
 	}
 	return cause

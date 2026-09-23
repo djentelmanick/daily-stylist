@@ -120,6 +120,10 @@ type DeliveryRepository interface {
 	Release(ctx context.Context, delivery MorningDelivery) error
 }
 
+type MorningTasks interface {
+	Publish(ctx context.Context, delivery MorningDelivery) error
+}
+
 type Notifier interface {
 	SendRecommendation(ctx context.Context, userID int64, recommendation Recommendation) error
 }
