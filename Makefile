@@ -1,4 +1,4 @@
-.PHONY: help dev docker docker-build stop down db db-down vision vision-build psql migrate migrate-status migrate-down migration proto redis-cli tun back sched sender front vision-venv check check-back check-db check-s3 check-redis check-rabbit check-vision check-gigachat check-front
+.PHONY: help dev docker docker-build stop down swagger db db-down vision vision-build psql migrate migrate-status migrate-down migration proto redis-cli tun back sched sender front vision-venv check check-back check-db check-s3 check-redis check-rabbit check-vision check-gigachat check-front
 
 -include backend/.env
 
@@ -38,6 +38,9 @@ help:
 	@echo "  make migrate-status      - какие применены, какие нет"
 	@echo "  make migrate-down        - откатить последнюю"
 	@echo "  make migration name=имя  - создать файл миграции, нужен goose CLI"
+	@echo ""
+	@echo "Документация API:"
+	@echo "  make swagger     - пересобрать описание Mini App API по аннотациям, нужен swag"
 	@echo ""
 	@echo "Распознавание одежды:"
 	@echo "  make proto       - перегенерировать код по contracts/vision.proto"
@@ -102,6 +105,11 @@ migrate-down:
 migration:
 	@test -n '$(name)' || { echo "укажите имя: make migration name=add_brand"; exit 1; }
 	cd backend && goose -s create $(name) sql
+
+swagger:
+	@command -v swag >/dev/null || { echo "нет swag. Поставьте его:"; \
+		echo "  go install github.com/swaggo/swag/cmd/swag@v1.16.6"; exit 1; }
+	cd backend && swag init -g cmd/bot/main.go -o docs --parseInternal --parseDepth 2
 
 proto:
 	@command -v protoc-gen-go >/dev/null && command -v protoc-gen-go-grpc >/dev/null || { \

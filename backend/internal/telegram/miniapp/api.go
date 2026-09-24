@@ -9,6 +9,9 @@ import (
 	"strconv"
 	"time"
 
+	httpSwagger "github.com/swaggo/http-swagger/v2"
+
+	_ "github.com/djentelmanick/daily-stylist/backend/docs"
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain"
 	"github.com/djentelmanick/daily-stylist/backend/internal/domain/rules"
 	"github.com/djentelmanick/daily-stylist/backend/internal/service"
@@ -82,27 +85,39 @@ func NewHandler(
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /api/options", api.options)
-	mux.HandleFunc("GET /api/items", api.listItems)
-	mux.HandleFunc("POST /api/items", api.createItem)
-	mux.HandleFunc("PUT /api/items/{id}", api.editItem)
-	mux.HandleFunc("PUT /api/items/{id}/status", api.changeItemStatus)
-	// Не DELETE с телом: тело у DELETE не определено стандартом, и прокси вправе его выбросить.
-	mux.HandleFunc("POST /api/items/delete", api.deleteItems)
-	mux.HandleFunc("POST /api/photos", api.requestPhotoUpload)
-	mux.HandleFunc("POST /api/photos/recognize", api.recognizePhoto)
-	mux.HandleFunc("GET /api/recommendation", api.recommend)
-	mux.HandleFunc("GET /api/outfits/today", api.todayOutfit)
-	mux.HandleFunc("PUT /api/outfits/today", api.wearToday)
-	mux.HandleFunc("GET /api/outfits/candidates", api.candidates)
-	mux.HandleFunc("GET /api/outfits/review", api.review)
-	mux.HandleFunc("GET /api/cities", api.searchCities)
-	mux.HandleFunc("GET /api/cities/at", api.cityAt)
-	mux.HandleFunc("PUT /api/city", api.setCity)
-	mux.HandleFunc("GET /api/settings", api.getSettings)
-	mux.HandleFunc("PUT /api/settings", api.saveSettings)
+	for pattern, handler := range api.routes() {
+		mux.HandleFunc(pattern, handler)
+	}
 
 	return requireUser(botToken, mux)
+}
+
+func DocsHandler() http.Handler {
+	return httpSwagger.Handler(httpSwagger.URL("doc.json"))
+}
+
+func (api *endpoints) routes() map[string]http.HandlerFunc {
+	return map[string]http.HandlerFunc{
+		"GET /api/options":           api.options,
+		"GET /api/items":             api.listItems,
+		"POST /api/items":            api.createItem,
+		"PUT /api/items/{id}":        api.editItem,
+		"PUT /api/items/{id}/status": api.changeItemStatus,
+		// Не DELETE с телом: тело у DELETE не определено стандартом, и прокси вправе его выбросить.
+		"POST /api/items/delete":      api.deleteItems,
+		"POST /api/photos":            api.requestPhotoUpload,
+		"POST /api/photos/recognize":  api.recognizePhoto,
+		"GET /api/recommendation":     api.recommend,
+		"GET /api/outfits/today":      api.todayOutfit,
+		"PUT /api/outfits/today":      api.wearToday,
+		"GET /api/outfits/candidates": api.candidates,
+		"GET /api/outfits/review":     api.review,
+		"GET /api/cities":             api.searchCities,
+		"GET /api/cities/at":          api.cityAt,
+		"PUT /api/city":               api.setCity,
+		"GET /api/settings":           api.getSettings,
+		"PUT /api/settings":           api.saveSettings,
+	}
 }
 
 type option struct {
@@ -139,6 +154,14 @@ type optionsResponse struct {
 	Limits        textLimits          `json:"limits"`
 }
 
+// @Summary  Словари для формы вещи
+// @Description Категории, цвета, сезоны, уровни теплоты, статусы и лимиты - с подписями по-русски. Источник значений - домен, поэтому форма не расходится с сервером.
+// @Tags     Гардероб
+// @Produce  json
+// @Security initData
+// @Success  200 {object} optionsResponse
+// @Failure  401 {object} errorResponse "unauthorized"
+// @Router   /api/options [get]
 func (api *endpoints) options(writer http.ResponseWriter, request *http.Request) {
 	response := optionsResponse{
 		// TODO: По времени сервера: пока нет часового пояса пользователя, ошибиться можно
@@ -205,6 +228,13 @@ type itemsResponse struct {
 	Items []itemResponse `json:"items"`
 }
 
+// @Summary  Все вещи пользователя
+// @Tags     Гардероб
+// @Produce  json
+// @Security initData
+// @Success  200 {object} itemsResponse
+// @Failure  401 {object} errorResponse "unauthorized"
+// @Router   /api/items [get]
 func (api *endpoints) listItems(writer http.ResponseWriter, request *http.Request) {
 	items, err := api.wardrobe.Items(request.Context(), userIDFrom(request.Context()))
 	if err != nil {
@@ -219,6 +249,18 @@ func (api *endpoints) listItems(writer http.ResponseWriter, request *http.Reques
 	writeJSON(writer, http.StatusOK, response)
 }
 
+// @Summary  Добавить вещь
+// @Tags     Гардероб
+// @Accept   json
+// @Produce  json
+// @Security initData
+// @Param    item body itemRequest true "Вещь"
+// @Success  201 {object} itemResponse
+// @Failure  400 {object} errorResponse "bad_request"
+// @Failure  401 {object} errorResponse "unauthorized"
+// @Failure  409 {object} errorResponse "wardrobe_full"
+// @Failure  422 {object} errorResponse "invalid_item"
+// @Router   /api/items [post]
 func (api *endpoints) createItem(writer http.ResponseWriter, request *http.Request) {
 	var body itemRequest
 	if !decodeBody(writer, request, &body) {
@@ -243,6 +285,19 @@ func (api *endpoints) createItem(writer http.ResponseWriter, request *http.Reque
 	writeJSON(writer, http.StatusCreated, api.toItemResponse(request.Context(), item))
 }
 
+// @Summary  Изменить вещь
+// @Tags     Гардероб
+// @Accept   json
+// @Produce  json
+// @Security initData
+// @Param    id path int true "Идентификатор вещи"
+// @Param    item body itemRequest true "Вещь"
+// @Success  200 {object} itemResponse
+// @Failure  400 {object} errorResponse "bad_request"
+// @Failure  401 {object} errorResponse "unauthorized"
+// @Failure  404 {object} errorResponse "not_found"
+// @Failure  422 {object} errorResponse "invalid_item"
+// @Router   /api/items/{id} [put]
 func (api *endpoints) editItem(writer http.ResponseWriter, request *http.Request) {
 	itemID, ok := itemIDFrom(writer, request)
 	if !ok {
@@ -274,6 +329,20 @@ type statusRequest struct {
 	Status string `json:"status"`
 }
 
+// @Summary  Сменить статус вещи
+// @Description Доступна, грязная или в архиве. «Не по сезону» статусом не бывает - это вычисляется по сезонам вещи.
+// @Tags     Гардероб
+// @Accept   json
+// @Produce  json
+// @Security initData
+// @Param    id path int true "Идентификатор вещи"
+// @Param    status body statusRequest true "Новый статус"
+// @Success  204 "Статус изменён"
+// @Failure  400 {object} errorResponse "bad_request"
+// @Failure  401 {object} errorResponse "unauthorized"
+// @Failure  404 {object} errorResponse "not_found"
+// @Failure  422 {object} errorResponse "invalid_item"
+// @Router   /api/items/{id}/status [put]
 func (api *endpoints) changeItemStatus(writer http.ResponseWriter, request *http.Request) {
 	itemID, ok := itemIDFrom(writer, request)
 	if !ok {
@@ -296,6 +365,17 @@ type deleteItemsRequest struct {
 	IDs []int64 `json:"ids"`
 }
 
+// @Summary  Удалить вещи
+// @Description Не DELETE с телом: тело у DELETE не определено стандартом, и прокси вправе его выбросить.
+// @Tags     Гардероб
+// @Accept   json
+// @Produce  json
+// @Security initData
+// @Param    ids body deleteItemsRequest true "Идентификаторы вещей"
+// @Success  204 "Вещи удалены"
+// @Failure  400 {object} errorResponse "bad_request"
+// @Failure  401 {object} errorResponse "unauthorized"
+// @Router   /api/items/delete [post]
 func (api *endpoints) deleteItems(writer http.ResponseWriter, request *http.Request) {
 	var body deleteItemsRequest
 	if !decodeBody(writer, request, &body) {
@@ -361,6 +441,18 @@ type photoUploadResponse struct {
 	ViewURL   string `json:"view_url"`
 }
 
+// @Summary  Запросить ссылку на загрузку фотографии
+// @Description Файл браузер кладёт в хранилище сам, по подписанной ссылке. Размер и тип входят в подпись, ключ придумывает сервер.
+// @Tags     Фотографии
+// @Accept   json
+// @Produce  json
+// @Security initData
+// @Param    photo body photoUploadRequest true "Тип и размер файла"
+// @Success  201 {object} photoUploadResponse
+// @Failure  400 {object} errorResponse "bad_request"
+// @Failure  401 {object} errorResponse "unauthorized"
+// @Failure  422 {object} errorResponse "photo_too_large, photo_type_unsupported"
+// @Router   /api/photos [post]
 func (api *endpoints) requestPhotoUpload(writer http.ResponseWriter, request *http.Request) {
 	var body photoUploadRequest
 	if !decodeBody(writer, request, &body) {
@@ -389,6 +481,20 @@ type suggestionResponse struct {
 	Waterproof  bool     `json:"waterproof"`
 }
 
+// @Summary  Распознать вещь на загруженной фотографии
+// @Description Пустое поле означает «не знаю»: неверная подсказка хуже её отсутствия.
+// @Tags     Фотографии
+// @Accept   json
+// @Produce  json
+// @Security initData
+// @Param    photo body recognizeRequest true "Ключ загруженной фотографии"
+// @Success  200 {object} suggestionResponse
+// @Failure  400 {object} errorResponse "bad_request"
+// @Failure  401 {object} errorResponse "unauthorized"
+// @Failure  422 {object} errorResponse "photo_not_uploaded"
+// @Failure  429 {object} errorResponse "recognition_limit"
+// @Failure  502 {object} errorResponse "recognition_unavailable"
+// @Router   /api/photos/recognize [post]
 func (api *endpoints) recognizePhoto(writer http.ResponseWriter, request *http.Request) {
 	var body recognizeRequest
 	if !decodeBody(writer, request, &body) {
@@ -480,8 +586,12 @@ func writeJSON(writer http.ResponseWriter, status int, body any) {
 	}
 }
 
+type errorResponse struct {
+	Error string `json:"error" example:"not_found"`
+}
+
 func writeError(writer http.ResponseWriter, status int, code string) {
-	writeJSON(writer, status, map[string]string{"error": code})
+	writeJSON(writer, status, errorResponse{Error: code})
 }
 
 func fromStrings[T ~string](values []string) []T {

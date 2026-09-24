@@ -1,0 +1,48 @@
+name: swagger
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "Makefile"
+      - ".github/workflows/swagger.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "Makefile"
+      - ".github/workflows/swagger.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swagger-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  generated:
+    name: описание API совпадает с аннотациями
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: install swag
+        run: |
+          go install github.com/swaggo/swag/cmd/swag@v1.16.6
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: generate
+        run: make swagger
+
+      - name: diff
+        run: |
+          if ! git diff --exit-code -- backend/docs; then
+            echo "::error::Описание API разошлось с аннотациями, выполните make swagger и закоммитьте результат"
+            exit 1
+          fi

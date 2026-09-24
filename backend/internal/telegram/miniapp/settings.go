@@ -19,6 +19,14 @@ type settingsResponse struct {
 	City           *cityBody `json:"city"`
 }
 
+// @Summary  Настройки рассылки и выбранный город
+// @Description Пока пользователь ничего не менял, возвращаются значения по умолчанию из домена: рассылка включена, время 7:00.
+// @Tags     Город и настройки
+// @Produce  json
+// @Security initData
+// @Success  200 {object} settingsResponse
+// @Failure  401 {object} errorResponse "unauthorized"
+// @Router   /api/settings [get]
 func (api *endpoints) getSettings(writer http.ResponseWriter, request *http.Request) {
 	ctx := request.Context()
 	userID := userIDFrom(ctx)
@@ -42,6 +50,17 @@ func (api *endpoints) getSettings(writer http.ResponseWriter, request *http.Requ
 	writeJSON(writer, http.StatusOK, response)
 }
 
+// @Summary  Сохранить настройки рассылки
+// @Tags     Город и настройки
+// @Accept   json
+// @Produce  json
+// @Security initData
+// @Param    settings body settingsRequest true "Настройки"
+// @Success  204 "Настройки сохранены"
+// @Failure  400 {object} errorResponse "bad_request"
+// @Failure  401 {object} errorResponse "unauthorized"
+// @Failure  422 {object} errorResponse "invalid_settings"
+// @Router   /api/settings [put]
 func (api *endpoints) saveSettings(writer http.ResponseWriter, request *http.Request) {
 	var body settingsRequest
 	if !decodeBody(writer, request, &body) {

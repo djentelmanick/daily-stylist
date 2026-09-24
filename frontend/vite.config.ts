@@ -18,7 +18,8 @@ export default defineConfig({
     // фотографиями в хранилище. Ни путь, ни заголовок Host менять нельзя -
     // они входят в подпись ссылки, и хранилище перестанет её принимать.
     proxy: {
-      '/api': backend,
+      // Описание API через туннель не отдаём: локально оно открывается прямо на порту бота.
+      '/api': { target: backend, bypass: (request) => (request.url?.startsWith('/api/docs') ? false : undefined) },
       '/telegram': backend,
       '/photos': storage,
     },

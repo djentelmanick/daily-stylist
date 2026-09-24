@@ -45,3 +45,18 @@ func TestRecognition_RefusesBrokenSettings(t *testing.T) {
 		})
 	}
 }
+
+func TestBot_RefusesUnknownEnv(t *testing.T) {
+	if err := (Bot{Env: "staging"}).validateEnv(); !errors.Is(err, ErrInvalidEnv) {
+		t.Errorf("ошибка = %v, ожидалась ErrInvalidEnv: описание API не должно включаться по опечатке", err)
+	}
+}
+
+func TestBot_DocsOnlyInDev(t *testing.T) {
+	if (Bot{Env: EnvProd}).DocsEnabled() {
+		t.Error("в проде описание API включено")
+	}
+	if !(Bot{Env: EnvDev}).DocsEnabled() {
+		t.Error("в разработке описание API выключено")
+	}
+}

@@ -1,0 +1,902 @@
+basePath: /
+definitions:
+  miniapp.candidateResponse:
+    properties:
+      item_id:
+        type: integer
+      notes:
+        items:
+          type: string
+        type: array
+    type: object
+  miniapp.candidatesResponse:
+    properties:
+      candidates:
+        items:
+          $ref: '#/definitions/miniapp.candidateResponse'
+        type: array
+    type: object
+  miniapp.categoryOption:
+    properties:
+      has_warmth:
+        type: boolean
+      label:
+        type: string
+      value:
+        type: string
+    type: object
+  miniapp.citiesResponse:
+    properties:
+      cities:
+        items:
+          $ref: '#/definitions/miniapp.cityBody'
+        type: array
+    type: object
+  miniapp.cityBody:
+    properties:
+      latitude:
+        type: number
+      longitude:
+        type: number
+      name:
+        type: string
+      region:
+        type: string
+      timezone:
+        type: string
+    type: object
+  miniapp.deleteItemsRequest:
+    properties:
+      ids:
+        items:
+          type: integer
+        type: array
+    type: object
+  miniapp.errorResponse:
+    properties:
+      error:
+        example: not_found
+        type: string
+    type: object
+  miniapp.itemRequest:
+    properties:
+      category:
+        type: string
+      description:
+        type: string
+      extra_colors:
+        items:
+          type: string
+        type: array
+      main_color:
+        type: string
+      name:
+        type: string
+      photo_key:
+        type: string
+      seasons:
+        items:
+          type: string
+        type: array
+      warmth_level:
+        type: integer
+      waterproof:
+        type: boolean
+    type: object
+  miniapp.itemResponse:
+    properties:
+      category:
+        type: string
+      description:
+        type: string
+      extra_colors:
+        items:
+          type: string
+        type: array
+      id:
+        type: integer
+      main_color:
+        type: string
+      name:
+        type: string
+      photo_key:
+        type: string
+      photo_url:
+        type: string
+      seasons:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      warmth_level:
+        type: integer
+      waterproof:
+        type: boolean
+    type: object
+  miniapp.itemsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/miniapp.itemResponse'
+        type: array
+    type: object
+  miniapp.option:
+    properties:
+      label:
+        type: string
+      value:
+        type: string
+    type: object
+  miniapp.optionsResponse:
+    properties:
+      categories:
+        items:
+          $ref: '#/definitions/miniapp.categoryOption'
+        type: array
+      colors:
+        items:
+          $ref: '#/definitions/miniapp.option'
+        type: array
+      current_season:
+        type: string
+      limits:
+        $ref: '#/definitions/miniapp.textLimits'
+      seasons:
+        items:
+          $ref: '#/definitions/miniapp.option'
+        type: array
+      statuses:
+        items:
+          $ref: '#/definitions/miniapp.option'
+        type: array
+      warmth_levels:
+        items:
+          $ref: '#/definitions/miniapp.warmthLevelOption'
+        type: array
+    type: object
+  miniapp.outfitResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/miniapp.itemResponse'
+        type: array
+      notes:
+        items:
+          type: string
+        type: array
+    type: object
+  miniapp.photoUploadRequest:
+    properties:
+      content_type:
+        type: string
+      size:
+        type: integer
+    type: object
+  miniapp.photoUploadResponse:
+    properties:
+      key:
+        type: string
+      upload_url:
+        type: string
+      view_url:
+        type: string
+    type: object
+  miniapp.recognizeRequest:
+    properties:
+      photo_key:
+        type: string
+    type: object
+  miniapp.recommendationResponse:
+    properties:
+      city:
+        $ref: '#/definitions/miniapp.cityBody'
+      notes:
+        items:
+          type: string
+        type: array
+      outfits:
+        items:
+          $ref: '#/definitions/miniapp.outfitResponse'
+        type: array
+      weather:
+        $ref: '#/definitions/miniapp.weatherResponse'
+    type: object
+  miniapp.reviewResponse:
+    properties:
+      notes:
+        items:
+          type: string
+        type: array
+    type: object
+  miniapp.settingsRequest:
+    properties:
+      morning_enabled:
+        type: boolean
+      send_at:
+        type: string
+    type: object
+  miniapp.settingsResponse:
+    properties:
+      city:
+        $ref: '#/definitions/miniapp.cityBody'
+      morning_enabled:
+        type: boolean
+      send_at:
+        type: string
+    type: object
+  miniapp.statusRequest:
+    properties:
+      status:
+        type: string
+    type: object
+  miniapp.suggestionResponse:
+    properties:
+      category:
+        type: string
+      extra_colors:
+        items:
+          type: string
+        type: array
+      main_color:
+        type: string
+      name:
+        type: string
+      seasons:
+        items:
+          type: string
+        type: array
+      warmth_level:
+        type: integer
+      waterproof:
+        type: boolean
+    type: object
+  miniapp.textLimits:
+    properties:
+      description:
+        type: integer
+      min_city_query:
+        type: integer
+      name:
+        type: integer
+      photo_bytes:
+        type: integer
+      photo_types:
+        items:
+          type: string
+        type: array
+    type: object
+  miniapp.todayOutfitResponse:
+    properties:
+      item_ids:
+        items:
+          type: integer
+        type: array
+    type: object
+  miniapp.warmthLevelOption:
+    properties:
+      label:
+        type: string
+      value:
+        type: integer
+    type: object
+  miniapp.wearRequest:
+    properties:
+      item_ids:
+        items:
+          type: integer
+        type: array
+    type: object
+  miniapp.weatherResponse:
+    properties:
+      details:
+        items:
+          type: string
+        type: array
+      temperature:
+        type: string
+    type: object
+info:
+  contact: {}
+  description: API страницы гардероба внутри Telegram. Пользователя сервер узнаёт
+    по подписанным данным запуска Mini App, идентификатор из тела и параметров не
+    берётся.
+  title: Daily Stylist Mini App API
+  version: 0.7.0
+paths:
+  /api/cities:
+    get:
+      parameters:
+      - description: Часть названия, не короче limits.min_city_query из /api/options
+        in: query
+        name: query
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/miniapp.citiesResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Найти город по названию
+      tags:
+      - Город и настройки
+  /api/cities/at:
+    get:
+      description: 'Координаты округляются до сотых, около километра: погоде точнее
+        не нужно.'
+      parameters:
+      - description: Широта
+        in: query
+        name: latitude
+        required: true
+        type: number
+      - description: Долгота
+        in: query
+        name: longitude
+        required: true
+        type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/miniapp.cityBody'
+        "400":
+          description: bad_request
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "404":
+          description: place_not_found
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Определить город по координатам
+      tags:
+      - Город и настройки
+  /api/city:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Город
+        in: body
+        name: city
+        required: true
+        schema:
+          $ref: '#/definitions/miniapp.cityBody'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Город сохранён
+        "400":
+          description: bad_request
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "422":
+          description: invalid_location
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Сохранить город пользователя
+      tags:
+      - Город и настройки
+  /api/items:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/miniapp.itemsResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Все вещи пользователя
+      tags:
+      - Гардероб
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Вещь
+        in: body
+        name: item
+        required: true
+        schema:
+          $ref: '#/definitions/miniapp.itemRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/miniapp.itemResponse'
+        "400":
+          description: bad_request
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "409":
+          description: wardrobe_full
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "422":
+          description: invalid_item
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Добавить вещь
+      tags:
+      - Гардероб
+  /api/items/{id}:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Идентификатор вещи
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Вещь
+        in: body
+        name: item
+        required: true
+        schema:
+          $ref: '#/definitions/miniapp.itemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/miniapp.itemResponse'
+        "400":
+          description: bad_request
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "404":
+          description: not_found
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "422":
+          description: invalid_item
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Изменить вещь
+      tags:
+      - Гардероб
+  /api/items/{id}/status:
+    put:
+      consumes:
+      - application/json
+      description: Доступна, грязная или в архиве. «Не по сезону» статусом не бывает
+        - это вычисляется по сезонам вещи.
+      parameters:
+      - description: Идентификатор вещи
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Новый статус
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/miniapp.statusRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Статус изменён
+        "400":
+          description: bad_request
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "404":
+          description: not_found
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "422":
+          description: invalid_item
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Сменить статус вещи
+      tags:
+      - Гардероб
+  /api/items/delete:
+    post:
+      consumes:
+      - application/json
+      description: 'Не DELETE с телом: тело у DELETE не определено стандартом, и прокси
+        вправе его выбросить.'
+      parameters:
+      - description: Идентификаторы вещей
+        in: body
+        name: ids
+        required: true
+        schema:
+          $ref: '#/definitions/miniapp.deleteItemsRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Вещи удалены
+        "400":
+          description: bad_request
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Удалить вещи
+      tags:
+      - Гардероб
+  /api/options:
+    get:
+      description: Категории, цвета, сезоны, уровни теплоты, статусы и лимиты - с
+        подписями по-русски. Источник значений - домен, поэтому форма не расходится
+        с сервером.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/miniapp.optionsResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Словари для формы вещи
+      tags:
+      - Гардероб
+  /api/outfits/candidates:
+    get:
+      description: 'Кандидаты отсортированы по тому, насколько вещь подходит: теплота,
+        цвета, дождь, недавнее ношение. Вещи не по сезону уходят в конец списка.'
+      parameters:
+      - description: Идентификаторы вещей образа через запятую
+        example: 12,15,31
+        in: query
+        name: items
+        required: true
+        type: string
+      - description: Какую вещь заменяем. Без неё - добавление вещи в образ
+        in: query
+        name: replace
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/miniapp.candidatesResponse'
+        "400":
+          description: bad_request
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "404":
+          description: not_found
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "409":
+          description: location_not_set
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "502":
+          description: weather_unavailable
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Чем заменить или дополнить образ
+      tags:
+      - Образ
+  /api/outfits/review:
+    get:
+      description: 'Те же заметки, что пишет подбор: чего не хватает и что не по погоде.'
+      parameters:
+      - description: Идентификаторы вещей образа через запятую
+        example: 12,15,31
+        in: query
+        name: items
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/miniapp.reviewResponse'
+        "400":
+          description: bad_request
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "409":
+          description: location_not_set
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "502":
+          description: weather_unavailable
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Разобрать образ по погоде
+      tags:
+      - Образ
+  /api/outfits/today:
+    get:
+      description: 'Только идентификаторы: сами вещи у приложения уже загружены.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/miniapp.todayOutfitResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Образ дня
+      tags:
+      - Образ
+    put:
+      consumes:
+      - application/json
+      description: Запись заменяет образ целиком, пустой список его очищает.
+      parameters:
+      - description: Вещи образа
+        in: body
+        name: outfit
+        required: true
+        schema:
+          $ref: '#/definitions/miniapp.wearRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Образ записан
+        "400":
+          description: bad_request
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "404":
+          description: not_found
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Записать образ дня
+      tags:
+      - Образ
+  /api/photos:
+    post:
+      consumes:
+      - application/json
+      description: Файл браузер кладёт в хранилище сам, по подписанной ссылке. Размер
+        и тип входят в подпись, ключ придумывает сервер.
+      parameters:
+      - description: Тип и размер файла
+        in: body
+        name: photo
+        required: true
+        schema:
+          $ref: '#/definitions/miniapp.photoUploadRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/miniapp.photoUploadResponse'
+        "400":
+          description: bad_request
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "422":
+          description: photo_too_large, photo_type_unsupported
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Запросить ссылку на загрузку фотографии
+      tags:
+      - Фотографии
+  /api/photos/recognize:
+    post:
+      consumes:
+      - application/json
+      description: 'Пустое поле означает «не знаю»: неверная подсказка хуже её отсутствия.'
+      parameters:
+      - description: Ключ загруженной фотографии
+        in: body
+        name: photo
+        required: true
+        schema:
+          $ref: '#/definitions/miniapp.recognizeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/miniapp.suggestionResponse'
+        "400":
+          description: bad_request
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "422":
+          description: photo_not_uploaded
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "429":
+          description: recognition_limit
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "502":
+          description: recognition_unavailable
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Распознать вещь на загруженной фотографии
+      tags:
+      - Фотографии
+  /api/recommendation:
+    get:
+      description: Несколько вариантов, лучший первым. Заметки - готовые строки по-русски.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/miniapp.recommendationResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "409":
+          description: location_not_set
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "502":
+          description: weather_unavailable
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Подобрать образы на сегодня
+      tags:
+      - Образ
+  /api/settings:
+    get:
+      description: 'Пока пользователь ничего не менял, возвращаются значения по умолчанию
+        из домена: рассылка включена, время 7:00.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/miniapp.settingsResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Настройки рассылки и выбранный город
+      tags:
+      - Город и настройки
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Настройки
+        in: body
+        name: settings
+        required: true
+        schema:
+          $ref: '#/definitions/miniapp.settingsRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Настройки сохранены
+        "400":
+          description: bad_request
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "401":
+          description: unauthorized
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+        "422":
+          description: invalid_settings
+          schema:
+            $ref: '#/definitions/miniapp.errorResponse'
+      security:
+      - initData: []
+      summary: Сохранить настройки рассылки
+      tags:
+      - Город и настройки
+securityDefinitions:
+  initData:
+    description: tma <initData> - данные запуска Mini App, подписанные токеном бота
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

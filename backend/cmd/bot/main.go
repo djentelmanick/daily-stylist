@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -24,6 +25,14 @@ import (
 	"github.com/djentelmanick/daily-stylist/backend/internal/telegram/miniapp"
 )
 
+// @title       Daily Stylist Mini App API
+// @version     0.7.0
+// @description API страницы гардероба внутри Telegram. Пользователя сервер узнаёт по подписанным данным запуска Mini App, идентификатор из тела и параметров не берётся.
+// @BasePath    /
+// @securityDefinitions.apikey initData
+// @in   header
+// @name Authorization
+// @description tma <initData> - данные запуска Mini App, подписанные токеном бота
 func main() {
 	if err := run(); err != nil {
 		log.Fatal(err)
@@ -89,6 +98,7 @@ func run() error {
 		WebhookPath:    cfg.WebhookPath,
 		WebhookSecret:  cfg.WebhookSecret,
 		ListenAddr:     cfg.ListenAddr,
+		Docs:           docsHandler(cfg),
 		MiniApp: miniapp.NewHandler(
 			cfg.Token,
 			wardrobe,
@@ -105,4 +115,12 @@ func run() error {
 
 	log.Printf("HTTP-сервер слушает %s: вебхук Telegram и API Mini App на %s", cfg.ListenAddr, cfg.WebhookPath)
 	return b.Run(ctx)
+}
+
+func docsHandler(cfg config.Bot) http.Handler {
+	if !cfg.DocsEnabled() {
+		return nil
+	}
+	log.Print("описание API включено, APP_ENV=dev")
+	return miniapp.DocsHandler()
 }

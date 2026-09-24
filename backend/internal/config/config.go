@@ -35,6 +35,13 @@ const (
 	RecognizerVision   = "vision"
 )
 
+const (
+	EnvDev  = "dev"
+	EnvProd = "prod"
+)
+
+var ErrInvalidEnv = errors.New("неверно задан режим работы")
+
 var allRecognizers = []string{RecognizerGigaChat, RecognizerVision}
 
 var ErrInvalidRecognizer = errors.New("неверно настроен распознаватель")
@@ -45,6 +52,7 @@ type Bot struct {
 	WebhookPath    string
 	WebhookSecret  string
 	ListenAddr     string
+	Env            string
 	DatabaseURL    string
 	RedisURL       string
 	Photos         PhotoStorage
@@ -89,6 +97,7 @@ func LoadBot() (Bot, error) {
 		WebhookPath:    env.optional("TELEGRAM_WEBHOOK_PATH", defaultWebhookPath),
 		WebhookSecret:  env.required("TELEGRAM_WEBHOOK_SECRET"),
 		ListenAddr:     env.optional("BOT_LISTEN_ADDR", defaultBotListenAddr),
+		Env:            env.optional("APP_ENV", EnvDev),
 		DatabaseURL:    env.required("DATABASE_URL"),
 		RedisURL:       env.required("REDIS_URL"),
 		Photos: PhotoStorage{
@@ -119,8 +128,22 @@ func LoadBot() (Bot, error) {
 	if err := cfg.Recognition.validate(); err != nil {
 		return Bot{}, err
 	}
+	if err := cfg.validateEnv(); err != nil {
+		return Bot{}, err
+	}
 
 	return cfg, nil
+}
+
+func (cfg Bot) validateEnv() error {
+	if cfg.Env != EnvDev && cfg.Env != EnvProd {
+		return fmt.Errorf("%w: APP_ENV=%q, ожидалось %s или %s", ErrInvalidEnv, cfg.Env, EnvDev, EnvProd)
+	}
+	return nil
+}
+
+func (cfg Bot) DocsEnabled() bool {
+	return cfg.Env == EnvDev
 }
 
 func (recognition Recognition) validate() error {

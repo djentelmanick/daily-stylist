@@ -28,7 +28,10 @@ type Options struct {
 	WebhookSecret  string
 	ListenAddr     string
 	MiniApp        http.Handler
+	Docs           http.Handler
 }
+
+const DocsPath = "/api/docs/"
 
 type Bot struct {
 	api        *bot.Bot
@@ -61,6 +64,9 @@ func New(ctx context.Context, opts Options, handler bot.HandlerFunc) (*Bot, erro
 	mux.Handle(pattern, api.WebhookHandler())
 	if opts.MiniApp != nil {
 		mux.Handle("/api/", opts.MiniApp)
+	}
+	if opts.Docs != nil {
+		mux.Handle(DocsPath, http.StripPrefix(strings.TrimSuffix(DocsPath, "/"), opts.Docs))
 	}
 
 	return &Bot{
