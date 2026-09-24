@@ -90,6 +90,22 @@ func validateInitData(initData, botToken string, maxAge time.Duration, now time.
 	return user.ID, nil
 }
 
+// Нужна для разработки: подпись для Swagger UI и curl, без открытия приложения.
+func SignInitData(botToken string, userID int64, authDate time.Time) string {
+	values := url.Values{}
+	values.Set("auth_date", strconv.FormatInt(authDate.Unix(), 10))
+	values.Set("user", fmt.Sprintf(`{"id":%d,"first_name":"Тест"}`, userID))
+
+	pairs := make([]string, 0, len(values))
+	for key := range values {
+		pairs = append(pairs, key+"="+values.Get(key))
+	}
+	slices.Sort(pairs)
+
+	values.Set("hash", sign(strings.Join(pairs, "\n"), botToken))
+	return values.Encode()
+}
+
 func sign(dataCheckString, botToken string) string {
 	secretKey := hmac.New(sha256.New, []byte("WebAppData"))
 	secretKey.Write([]byte(botToken))

@@ -26,7 +26,7 @@ func TestRecognizePhoto_ReturnsFieldsForTheForm(t *testing.T) {
 	handler := newHandlerWithRecognition(recognition)
 
 	response := serve(handler, newRequest(http.MethodPost, "/api/photos/recognize",
-		`{"photo_key":"users/42/photo.jpg"}`, signedInitData(testBotToken, 42, time.Now())))
+		`{"photo_key":"users/42/photo.jpg"}`, SignInitData(testBotToken, 42, time.Now())))
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, ожидался %d; тело: %s", response.Code, http.StatusOK, response.Body)
@@ -63,7 +63,7 @@ func TestRecognizePhoto_NothingRecognizedIsStillAnAnswer(t *testing.T) {
 	handler := newHandlerWithRecognition(&stubRecognition{})
 
 	response := serve(handler, newRequest(http.MethodPost, "/api/photos/recognize",
-		`{"photo_key":"users/42/photo.jpg"}`, signedInitData(testBotToken, 42, time.Now())))
+		`{"photo_key":"users/42/photo.jpg"}`, SignInitData(testBotToken, 42, time.Now())))
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, ожидался %d; тело: %s", response.Code, http.StatusOK, response.Body)
@@ -98,7 +98,7 @@ func TestRecognizePhoto_TellsWhyThereIsNoSuggestion(t *testing.T) {
 			handler := newHandlerWithRecognition(&stubRecognition{err: test.err})
 
 			response := serve(handler, newRequest(http.MethodPost, "/api/photos/recognize",
-				`{"photo_key":"users/42/photo.jpg"}`, signedInitData(testBotToken, 42, time.Now())))
+				`{"photo_key":"users/42/photo.jpg"}`, SignInitData(testBotToken, 42, time.Now())))
 
 			checkError(t, response, test.status, test.code)
 		})

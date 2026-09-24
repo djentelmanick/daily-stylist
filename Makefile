@@ -1,4 +1,4 @@
-.PHONY: help dev docker docker-build stop down swagger db db-down vision vision-build psql migrate migrate-status migrate-down migration proto redis-cli tun back sched sender front vision-venv check check-back check-db check-s3 check-redis check-rabbit check-vision check-gigachat check-front
+.PHONY: help dev docker docker-build stop down swagger initdata db db-down vision vision-build psql migrate migrate-status migrate-down migration proto redis-cli tun back sched sender front vision-venv check check-back check-db check-s3 check-redis check-rabbit check-vision check-gigachat check-front
 
 -include backend/.env
 
@@ -41,6 +41,7 @@ help:
 	@echo ""
 	@echo "Документация API:"
 	@echo "  make swagger     - пересобрать описание Mini App API по аннотациям, нужен swag"
+	@echo "  make initdata user=12345 - подпись Telegram для Swagger UI и curl"
 	@echo ""
 	@echo "Распознавание одежды:"
 	@echo "  make proto       - перегенерировать код по contracts/vision.proto"
@@ -105,6 +106,10 @@ migrate-down:
 migration:
 	@test -n '$(name)' || { echo "укажите имя: make migration name=add_brand"; exit 1; }
 	cd backend && goose -s create $(name) sql
+
+initdata:
+	@test -n '$(user)' || { echo "укажите пользователя: make initdata user=12345"; exit 1; }
+	@cd backend && go run ./cmd/initdata -user $(user)
 
 swagger:
 	@command -v swag >/dev/null || { echo "нет swag. Поставьте его:"; \

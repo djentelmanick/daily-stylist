@@ -14,7 +14,7 @@ func TestRequestPhotoUpload_ReturnsKeyAndLink(t *testing.T) {
 	handler := newHandler(service.NewWardrobe(&memoryRepository{}, &stubPhotos{}))
 
 	response := serve(handler, newRequest(http.MethodPost, "/api/photos",
-		`{"content_type":"image/jpeg","size":2048}`, signedInitData(testBotToken, 42, time.Now())))
+		`{"content_type":"image/jpeg","size":2048}`, SignInitData(testBotToken, 42, time.Now())))
 
 	if response.Code != http.StatusCreated {
 		t.Fatalf("status = %d, ожидался %d; тело: %s", response.Code, http.StatusCreated, response.Body)
@@ -43,7 +43,7 @@ func TestRequestPhotoUpload_TellsWhyFileWasRejected(t *testing.T) {
 			handler := NewHandler(testBotToken, failingWardrobe{}, &stubRecommender{}, nil, nil, photos, &stubRecognition{})
 
 			response := serve(handler, newRequest(http.MethodPost, "/api/photos",
-				`{"content_type":"image/jpeg","size":2048}`, signedInitData(testBotToken, 42, time.Now())))
+				`{"content_type":"image/jpeg","size":2048}`, SignInitData(testBotToken, 42, time.Now())))
 
 			checkError(t, response, http.StatusUnprocessableEntity, test.code)
 		})
@@ -55,7 +55,7 @@ func TestCreateItem_AttachesPhotoAndReturnsItsLink(t *testing.T) {
 	handler := newHandlerWithPhotos(service.NewWardrobe(&memoryRepository{}, photos), photos)
 
 	body := `{"name":"Синее худи","category":"top","main_color":"blue","seasons":["autumn"],"warmth_level":2,"photo_key":"users/42/photo.jpg"}`
-	response := serve(handler, newRequest(http.MethodPost, "/api/items", body, signedInitData(testBotToken, 42, time.Now())))
+	response := serve(handler, newRequest(http.MethodPost, "/api/items", body, SignInitData(testBotToken, 42, time.Now())))
 
 	if response.Code != http.StatusCreated {
 		t.Fatalf("status = %d, ожидался %d; тело: %s", response.Code, http.StatusCreated, response.Body)
@@ -80,7 +80,7 @@ func TestCreateItem_RefusesPhotoNobodyUploaded(t *testing.T) {
 	handler := newHandlerWithPhotos(service.NewWardrobe(&memoryRepository{}, photos), photos)
 
 	body := `{"name":"Синее худи","category":"top","main_color":"blue","seasons":["autumn"],"warmth_level":2,"photo_key":"users/7/чужая.jpg"}`
-	response := serve(handler, newRequest(http.MethodPost, "/api/items", body, signedInitData(testBotToken, 42, time.Now())))
+	response := serve(handler, newRequest(http.MethodPost, "/api/items", body, SignInitData(testBotToken, 42, time.Now())))
 
 	checkError(t, response, http.StatusUnprocessableEntity, "photo_not_uploaded")
 }
@@ -89,7 +89,7 @@ func TestListItems_ItemWithoutPhotoHasNoLink(t *testing.T) {
 	handler := newHandler(service.NewWardrobe(&memoryRepository{}, &stubPhotos{}))
 	createAs(t, handler, 42)
 
-	response := serve(handler, newRequest(http.MethodGet, "/api/items", "", signedInitData(testBotToken, 42, time.Now())))
+	response := serve(handler, newRequest(http.MethodGet, "/api/items", "", SignInitData(testBotToken, 42, time.Now())))
 
 	var body itemsResponse
 	if err := json.NewDecoder(response.Body).Decode(&body); err != nil {

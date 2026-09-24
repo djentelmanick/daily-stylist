@@ -14,7 +14,7 @@ import (
 func TestGetSettings_DefaultsWithoutCity(t *testing.T) {
 	handler := newSettingsHandler(&memorySettings{}, &memoryLocations{})
 
-	response := serve(handler, newRequest(http.MethodGet, "/api/settings", "", signedInitData(testBotToken, 42, time.Now())))
+	response := serve(handler, newRequest(http.MethodGet, "/api/settings", "", SignInitData(testBotToken, 42, time.Now())))
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, ожидался %d; тело: %s", response.Code, http.StatusOK, response.Body)
@@ -35,7 +35,7 @@ func TestSaveSettings(t *testing.T) {
 		t.Fatalf("Save: %v", err)
 	}
 	handler := newSettingsHandler(repository, locations)
-	initData := signedInitData(testBotToken, 42, time.Now())
+	initData := SignInitData(testBotToken, 42, time.Now())
 
 	response := serve(handler, newRequest(http.MethodPut, "/api/settings", `{"morning_enabled":false,"send_at":"09:30"}`, initData))
 	if response.Code != http.StatusNoContent {
@@ -57,7 +57,7 @@ func TestSaveSettings(t *testing.T) {
 func TestSaveSettings_RejectsTimeOutsideDay(t *testing.T) {
 	handler := newSettingsHandler(&memorySettings{}, &memoryLocations{})
 
-	response := serve(handler, newRequest(http.MethodPut, "/api/settings", `{"morning_enabled":true,"send_at":"25:00"}`, signedInitData(testBotToken, 42, time.Now())))
+	response := serve(handler, newRequest(http.MethodPut, "/api/settings", `{"morning_enabled":true,"send_at":"25:00"}`, SignInitData(testBotToken, 42, time.Now())))
 
 	checkError(t, response, http.StatusUnprocessableEntity, "invalid_settings")
 }

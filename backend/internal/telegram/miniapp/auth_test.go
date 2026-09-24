@@ -2,7 +2,6 @@ package miniapp
 
 import (
 	"errors"
-	"fmt"
 	"net/url"
 	"slices"
 	"strconv"
@@ -35,7 +34,7 @@ func TestValidateInitData_AcceptsIndependentSignature(t *testing.T) {
 func TestValidateInitData_AcceptsOwnSignature(t *testing.T) {
 	now := time.Now()
 
-	userID, err := validateInitData(signedInitData(testBotToken, 42, now), testBotToken, initDataMaxAge, now)
+	userID, err := validateInitData(SignInitData(testBotToken, 42, now), testBotToken, initDataMaxAge, now)
 	if err != nil {
 		t.Fatalf("validateInitData: %v", err)
 	}
@@ -54,9 +53,9 @@ func TestValidateInitData_Rejects(t *testing.T) {
 		name     string
 		initData string
 	}{
-		{"подпись другим токеном", signedInitData("999:OTHER-TOKEN", 42, now)},
-		{"изменённые данные", withUser(signedInitData(testBotToken, 42, now), `{"id":43}`)},
-		{"устаревшие данные", signedInitData(testBotToken, 42, now.Add(-initDataMaxAge-time.Minute))},
+		{"подпись другим токеном", SignInitData("999:OTHER-TOKEN", 42, now)},
+		{"изменённые данные", withUser(SignInitData(testBotToken, 42, now), `{"id":43}`)},
+		{"устаревшие данные", SignInitData(testBotToken, 42, now.Add(-initDataMaxAge-time.Minute))},
 		{"без подписи", "auth_date=1&user=%7B%22id%22%3A42%7D"},
 		{"не query-строка", "here comes something wrong;"},
 		{"без пользователя", withHash(withoutUser, testBotToken)},
@@ -69,13 +68,6 @@ func TestValidateInitData_Rejects(t *testing.T) {
 			}
 		})
 	}
-}
-
-func signedInitData(botToken string, userID int64, authDate time.Time) string {
-	values := url.Values{}
-	values.Set("auth_date", strconv.FormatInt(authDate.Unix(), 10))
-	values.Set("user", fmt.Sprintf(`{"id":%d,"first_name":"Тест"}`, userID))
-	return withHash(values, botToken)
 }
 
 func withHash(values url.Values, botToken string) string {

@@ -31,7 +31,7 @@ func TestRecommend_ReturnsOutfitsWithTexts(t *testing.T) {
 	}}
 	handler := NewHandler(testBotToken, failingWardrobe{}, recommender, service.NewLocations(&memoryLocations{}, stubCities{}, nil, nil), nil, &stubPhotos{}, &stubRecognition{})
 
-	response := serve(handler, newRequest(http.MethodGet, "/api/recommendation", "", signedInitData(testBotToken, 42, time.Now())))
+	response := serve(handler, newRequest(http.MethodGet, "/api/recommendation", "", SignInitData(testBotToken, 42, time.Now())))
 
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, ожидался %d; тело: %s", response.Code, http.StatusOK, response.Body)
@@ -65,7 +65,7 @@ func TestRecommend_MapsErrors(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			handler := NewHandler(testBotToken, failingWardrobe{}, &stubRecommender{err: test.err}, service.NewLocations(&memoryLocations{}, stubCities{}, nil, nil), nil, &stubPhotos{}, &stubRecognition{})
 
-			response := serve(handler, newRequest(http.MethodGet, "/api/recommendation", "", signedInitData(testBotToken, 42, time.Now())))
+			response := serve(handler, newRequest(http.MethodGet, "/api/recommendation", "", SignInitData(testBotToken, 42, time.Now())))
 
 			checkError(t, response, test.wantStatus, test.wantCode)
 		})
@@ -75,7 +75,7 @@ func TestRecommend_MapsErrors(t *testing.T) {
 func TestWearToday(t *testing.T) {
 	recommender := &stubRecommender{}
 	handler := NewHandler(testBotToken, failingWardrobe{}, recommender, service.NewLocations(&memoryLocations{}, stubCities{}, nil, nil), nil, &stubPhotos{}, &stubRecognition{})
-	initData := signedInitData(testBotToken, 42, time.Now())
+	initData := SignInitData(testBotToken, 42, time.Now())
 
 	response := serve(handler, newRequest(http.MethodPut, "/api/outfits/today", `{"item_ids":[3,1]}`, initData))
 	if response.Code != http.StatusNoContent {
@@ -100,7 +100,7 @@ func TestCandidates(t *testing.T) {
 		{Item: domain.Item{ID: 4}},
 	}}
 	handler := NewHandler(testBotToken, failingWardrobe{}, recommender, service.NewLocations(&memoryLocations{}, stubCities{}, nil, nil), nil, &stubPhotos{}, &stubRecognition{})
-	initData := signedInitData(testBotToken, 42, time.Now())
+	initData := SignInitData(testBotToken, 42, time.Now())
 
 	response := serve(handler, newRequest(http.MethodGet, "/api/outfits/candidates?items=3,5&replace=5", "", initData))
 	want := `{"candidates":[{"item_id":9,"notes":["Надевали вчера"]},{"item_id":4,"notes":[]}]}`
@@ -126,7 +126,7 @@ func TestReview(t *testing.T) {
 	recommender := &stubRecommender{notes: []domain.Note{{Kind: domain.NoteMissing, Category: domain.CategoryShoes}}}
 	handler := NewHandler(testBotToken, failingWardrobe{}, recommender, service.NewLocations(&memoryLocations{}, stubCities{}, nil, nil), nil, &stubPhotos{}, &stubRecognition{})
 
-	response := serve(handler, newRequest(http.MethodGet, "/api/outfits/review?items=2", "", signedInitData(testBotToken, 42, time.Now())))
+	response := serve(handler, newRequest(http.MethodGet, "/api/outfits/review?items=2", "", SignInitData(testBotToken, 42, time.Now())))
 
 	if got := strings.TrimSpace(response.Body.String()); got != `{"notes":["Нет доступной вещи в категории «Обувь»"]}` {
 		t.Errorf("тело = %s", got)
@@ -139,7 +139,7 @@ func TestReview(t *testing.T) {
 func TestTodayOutfit(t *testing.T) {
 	recommender := &stubRecommender{today: []domain.Item{{ID: 7}, {ID: 3}}}
 	handler := NewHandler(testBotToken, failingWardrobe{}, recommender, service.NewLocations(&memoryLocations{}, stubCities{}, nil, nil), nil, &stubPhotos{}, &stubRecognition{})
-	initData := signedInitData(testBotToken, 42, time.Now())
+	initData := SignInitData(testBotToken, 42, time.Now())
 
 	response := serve(handler, newRequest(http.MethodGet, "/api/outfits/today", "", initData))
 	if got := strings.TrimSpace(response.Body.String()); got != `{"item_ids":[7,3]}` {
@@ -156,7 +156,7 @@ func TestTodayOutfit(t *testing.T) {
 func TestSearchCities(t *testing.T) {
 	cities := stubCities{cities: []domain.Location{kazan}}
 	handler := NewHandler(testBotToken, failingWardrobe{}, &stubRecommender{}, service.NewLocations(&memoryLocations{}, cities, nil, nil), nil, &stubPhotos{}, &stubRecognition{})
-	initData := signedInitData(testBotToken, 42, time.Now())
+	initData := SignInitData(testBotToken, 42, time.Now())
 
 	response := serve(handler, newRequest(http.MethodGet, "/api/cities?query="+url.QueryEscape("Каз"), "", initData))
 	var body citiesResponse
@@ -176,7 +176,7 @@ func TestSearchCities(t *testing.T) {
 func TestSetCity(t *testing.T) {
 	repository := &memoryLocations{}
 	handler := NewHandler(testBotToken, failingWardrobe{}, &stubRecommender{}, service.NewLocations(repository, stubCities{}, nil, nil), nil, &stubPhotos{}, &stubRecognition{})
-	initData := signedInitData(testBotToken, 42, time.Now())
+	initData := SignInitData(testBotToken, 42, time.Now())
 
 	valid := `{"name":"Казань","region":"Татарстан, Россия","latitude":55.79,"longitude":49.12,"timezone":"Europe/Moscow"}`
 	response := serve(handler, newRequest(http.MethodPut, "/api/city", valid, initData))
@@ -234,7 +234,7 @@ func (recommender *stubRecommender) Review(_ context.Context, _ int64, itemIDs [
 func TestCityAt(t *testing.T) {
 	places := stubPlaces{name: "Казань", region: "Татарстан, Россия", zone: "Europe/Moscow"}
 	handler := NewHandler(testBotToken, failingWardrobe{}, &stubRecommender{}, service.NewLocations(&memoryLocations{}, stubCities{}, places, places), nil, &stubPhotos{}, &stubRecognition{})
-	initData := signedInitData(testBotToken, 42, time.Now())
+	initData := SignInitData(testBotToken, 42, time.Now())
 
 	response := serve(handler, newRequest(http.MethodGet, "/api/cities/at?latitude=55.7946&longitude=49.1115", "", initData))
 	want := `{"name":"Казань","region":"Татарстан, Россия","latitude":55.79,"longitude":49.11,"timezone":"Europe/Moscow"}`
